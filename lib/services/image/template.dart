@@ -75,41 +75,76 @@ class InfographicTemplate {
         w * 0.039, w * 0.0013);
   }
 
-  /// Затемнение (замерено по макетам): слева — чёрный градиент 74% → 0
-  /// на 40% ширины, снизу — под текст.
+  /// Затемнения главного фото (сняты с макетов АЗС и ворот):
+  /// слева — чёрный градиент по x, сверху над логотипом — мягкое пятно,
+  /// снизу — под текст.
   void _shade(ui.Canvas canvas, double w, double h) {
-    // Профиль непрозрачности по x (доли ширины), снят с макета.
-    const profile = <List<double>>[
-      [0, 0.74],
-      [0.05, 0.716],
-      [0.1, 0.645],
-      [0.15, 0.54],
-      [0.2, 0.38],
-      [0.25, 0.23],
-      [0.3, 0.10],
-      [0.35, 0.045],
+    // Левый градиент: [доля ширины, непрозрачность].
+    const left = <List<double>>[
+      [0, 0.735],
+      [0.05, 0.71],
+      [0.1, 0.643],
+      [0.15, 0.535],
+      [0.2, 0.37],
+      [0.25, 0.215],
+      [0.3, 0.095],
+      [0.35, 0.037],
       [0.4, 0],
     ];
-    final stops = [for (final p in profile) p[0] / 0.4];
-    final colors = [for (final p in profile) Color.fromRGBO(0, 0, 0, p[1])];
     canvas.drawRect(
       Rect.fromLTWH(0, 0, w, h),
       Paint()
-        ..shader =
-            ui.Gradient.linear(Offset.zero, Offset(w * 0.4, 0), colors, stops),
+        ..shader = ui.Gradient.linear(
+          Offset.zero,
+          Offset(w * 0.4, 0),
+          [for (final p in left) Color.fromRGBO(0, 0, 0, p[1])],
+          [for (final p in left) p[0] / 0.4],
+        ),
     );
+
+    // Пятно над логотипом: гаусс 23%, центр (0.16w; −0.04w), σ = 0.1075w.
+    _gaussSpot(canvas, Offset(w * 0.16, -w * 0.04), w * 0.1075, 0.23);
+
+    // Нижний градиент: [доля высоты, непрозрачность].
+    const bottom = <List<double>>[
+      [0.72, 0],
+      [0.75, 0.10],
+      [0.78, 0.245],
+      [0.81, 0.41],
+      [0.84, 0.555],
+      [0.87, 0.65],
+      [0.90, 0.715],
+      [0.95, 0.755],
+      [1.0, 0.765],
+    ];
     canvas.drawRect(
-      Rect.fromLTWH(0, h * 0.70, w, h * 0.30),
+      Rect.fromLTWH(0, h * 0.72, w, h * 0.28),
       Paint()
         ..shader = ui.Gradient.linear(
-          Offset(0, h * 0.70),
+          Offset(0, h * 0.72),
           Offset(0, h),
-          [
-            for (final a in const [0.0, 0.08, 0.32, 0.58, 0.70, 0.82])
-              Color.fromRGBO(0, 0, 0, a),
-          ],
-          const [0.0, 0.1667, 0.3333, 0.5, 0.6667, 1.0],
+          [for (final p in bottom) Color.fromRGBO(0, 0, 0, p[1])],
+          [for (final p in bottom) (p[0] - 0.72) / 0.28],
         ),
+    );
+  }
+
+  void _gaussSpot(ui.Canvas canvas, Offset c, double sigma, double alpha) {
+    final r = sigma * 3;
+    final stops = [for (var i = 0; i <= 12; i++) i / 12];
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()
+        ..shader = ui.Gradient.radial(
+            c,
+            r,
+            [
+              for (final t in stops)
+                Color.fromRGBO(
+                    0, 0, 0, alpha * math.exp(-(t * 3) * (t * 3) / 2)),
+            ],
+            stops),
     );
   }
 
@@ -158,6 +193,35 @@ class InfographicTemplate {
         minWidth: align == TextAlign.center ? maxW : 0,
         maxWidth: math.max(1, maxW));
   }
+}
+
+/// Угловое затемнение под логотипом на остальных фото (снято с примеров):
+/// эллипс с центром за пределами кадра (−0.68w; −0.68w), вытянутый по
+/// вертикали в 1.2 раза; 72% до радиуса 0.88w, затем плавно до 0 к 1.36w.
+void paintCornerShade(ui.Canvas canvas, Size size) {
+  final w = size.width;
+  const inner = 0.88, span = 0.48, alpha = 0.72;
+  final stops = <double>[];
+  final colors = <Color>[];
+  const outer = inner + span;
+  for (var i = 0; i <= 12; i++) {
+    final d = inner + span * i / 12;
+    final t = i / 12;
+    stops.add(d / outer);
+    colors.add(Color.fromRGBO(0, 0, 0, alpha * (1 - t * t * (3 - 2 * t))));
+  }
+  stops.insert(0, 0);
+  colors.insert(0, const Color.fromRGBO(0, 0, 0, alpha));
+  canvas.save();
+  canvas.clipRect(Offset.zero & size);
+  canvas.translate(-0.68 * w, -0.68 * w);
+  canvas.scale(1, 1.2);
+  canvas.drawCircle(
+    Offset.zero,
+    outer * w,
+    Paint()..shader = ui.Gradient.radial(Offset.zero, outer * w, colors, stops),
+  );
+  canvas.restore();
 }
 
 /// Позиция и размер логотипа (замерено по макету): слева сверху,

@@ -89,8 +89,10 @@ class ImageProcessor {
   Future<Uint8List> renderOther(String path,
       {int? maxSide, int quality = 92}) async {
     final logo = await _loadLogo();
-    final image =
-        await _draw(path, maxSide, (c, s) async => _drawLogo(c, s, logo));
+    final image = await _draw(path, maxSide, (c, s) async {
+      paintCornerShade(c, s);
+      _drawLogo(c, s, logo);
+    });
     return _toJpeg(image, quality);
   }
 
