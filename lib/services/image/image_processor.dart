@@ -1,12 +1,10 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:image/image.dart' as img;
 
 import '../../models/post_draft.dart';
+import '../../platform/platform.dart';
 import 'template.dart';
 
 /// Вся обработка фото на устройстве. `maxSide == null` — полное разрешение.
@@ -15,13 +13,17 @@ class ImageProcessor {
   final LogoPlacement logoPlacement;
   final _assets = <String, ui.Image>{};
 
+  /// Чтение исходного фото по ссылке (файл, blob-URL, ключ истории).
+  final Future<Uint8List> Function(String ref) read;
+
   ImageProcessor({
+    required this.read,
     InfographicTemplate? template,
     this.logoPlacement = const LogoPlacement(),
   }) : template = template ?? InfographicTemplate();
 
   Future<ui.Image> _decode(String path) async {
-    final bytes = await File(path).readAsBytes();
+    final bytes = await read(path);
     final codec = await ui.instantiateImageCodec(bytes);
     final frame = await codec.getNextFrame();
     return frame.image;
@@ -83,8 +85,7 @@ class ImageProcessor {
     final bd = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
     final w = image.width, h = image.height;
     image.dispose();
-    return compute(
-        _encodeJpg, _JpgJob(bd!.buffer.asUint8List(), w, h, quality));
+    return encodeJpeg(bd!.buffer.asUint8List(), w, h, quality);
   }
 
   /// Главное фото с инфографикой.
@@ -166,20 +167,4 @@ class ImageProcessor {
     final image = await _draw(path, 1024, (c, s) async {});
     return _toJpeg(image, 80);
   }
-}
-
-class _JpgJob {
-  final Uint8List rgba;
-  final int w, h, quality;
-  _JpgJob(this.rgba, this.w, this.h, this.quality);
-}
-
-Uint8List _encodeJpg(_JpgJob j) {
-  final im = img.Image.fromBytes(
-    width: j.w,
-    height: j.h,
-    bytes: j.rgba.buffer,
-    numChannels: 4,
-  );
-  return Uint8List.fromList(img.encodeJpg(im, quality: j.quality));
 }

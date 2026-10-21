@@ -19,6 +19,16 @@ class CraftApp extends StatelessWidget {
       title: 'CRAFT Посты',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
+      // В браузере на компьютере — колонка шириной с телефон по центру.
+      builder: (context, child) => ColoredBox(
+        color: const Color(0xFFDCE9F2),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: child,
+          ),
+        ),
+      ),
       home: const PhotoSelectScreen(),
     );
   }

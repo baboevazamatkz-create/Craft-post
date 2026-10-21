@@ -30,6 +30,8 @@ ThemeData buildTheme() {
 
   return ThemeData(
     useMaterial3: true,
+    // Шрифт встроен в приложение: в браузере не зависит от Google Fonts.
+    fontFamily: 'Roboto',
     colorScheme: scheme,
     scaffoldBackgroundColor: Brand.background,
     appBarTheme: const AppBarTheme(
@@ -38,6 +40,7 @@ ThemeData buildTheme() {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       titleTextStyle: TextStyle(
+        fontFamily: 'Roboto',
         color: Brand.ink,
         fontSize: 21,
         fontWeight: FontWeight.w700,
@@ -53,7 +56,8 @@ ThemeData buildTheme() {
         disabledForegroundColor: Colors.white,
         minimumSize: const Size.fromHeight(60),
         shape: RoundedRectangleBorder(borderRadius: radius),
-        textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        textStyle: const TextStyle(
+            fontFamily: 'Roboto', fontSize: 18, fontWeight: FontWeight.w700),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -63,7 +67,8 @@ ThemeData buildTheme() {
         minimumSize: const Size.fromHeight(56),
         side: const BorderSide(color: Brand.sky, width: 1.5),
         shape: RoundedRectangleBorder(borderRadius: radius),
-        textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(
+            fontFamily: 'Roboto', fontSize: 17, fontWeight: FontWeight.w600),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(

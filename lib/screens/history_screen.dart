@@ -36,7 +36,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       builder: (c) => AlertDialog(
         title: const Text('Удалить пост?'),
         content: Text('«${p.title}» будет удалён из приложения. '
-            'Фото в галерее телефона останутся.'),
+            'Уже сохранённые фото останутся.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(c, false),
@@ -92,7 +92,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(10),
                         child: p.preview != null
-                            ? Image.file(p.preview!,
+                            ? Image.memory(p.preview!,
                                 width: 72,
                                 height: 96,
                                 fit: BoxFit.cover,
@@ -114,7 +114,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             Text(_date(p.createdAt),
                                 style: const TextStyle(color: Brand.deep)),
                             const SizedBox(height: 4),
-                            Text('В галерее: ${p.saved} из ${p.total}',
+                            Text('Сохранено: ${p.saved} из ${p.total}',
                                 style: TextStyle(
                                     color: p.saved == p.total && p.total > 0
                                         ? const Color(0xFF2E9E5B)

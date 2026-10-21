@@ -211,7 +211,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
     final failed = s.countState({SaveState.error});
     const white = TextStyle(color: Colors.white, fontSize: 17);
     return ListView(padding: const EdgeInsets.all(20), children: [
-      Text('Сохранено в галерею: $saved из $total',
+      Text('Сохранено ${s.saver.target}: $saved из $total',
           style: white.copyWith(fontSize: 22, fontWeight: FontWeight.w700)),
       const SizedBox(height: 12),
       if (active > 0) ...[

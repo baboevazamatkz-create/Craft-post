@@ -4,8 +4,9 @@ import 'package:image_picker/image_picker.dart';
 import 'models/post_draft.dart';
 import 'services/ai/ai_factory.dart';
 import 'services/ai/ai_provider.dart';
-import 'services/gallery_saver.dart';
+import 'platform/platform.dart';
 import 'services/image/image_processor.dart';
+import 'services/image_saver.dart';
 import 'services/post_store.dart';
 import 'services/settings_service.dart';
 
@@ -15,10 +16,10 @@ enum SaveState { none, queued, saving, saved, error }
 
 class AppState extends ChangeNotifier {
   final settings = SettingsService();
-  final processor = ImageProcessor();
-  final store = PostStore();
+  final PostStore store = createPostStore();
+  late final processor = ImageProcessor(read: store.readPhoto);
   final _picker = ImagePicker();
-  final _saver = GallerySaver();
+  final ImageSaver saver = createImageSaver();
 
   PostDraft draft = PostDraft();
 
@@ -141,14 +142,14 @@ class AppState extends ChangeNotifier {
     }
 
     try {
-      if (!await _saver.ensureAccess()) {
-        throw Exception('Нет разрешения на сохранение в галерею');
+      if (!await saver.ensureAccess()) {
+        throw Exception('Нет разрешения на сохранение ${saver.target}');
       }
       set(SaveState.saving);
       final jpg = i == 0
           ? await processor.renderMain(post.mainPath!, post.infographic)
           : await processor.renderOther(post.otherPaths[i - 1]);
-      await _saver.save(jpg, 'craft_${post.id ?? 'post'}_${i + 1}');
+      await saver.save(jpg, 'craft_${post.id ?? 'post'}_${i + 1}');
       if (i < post.saved.length) post.saved[i] = true;
       await store.save(post, previews: false);
       set(SaveState.saved);

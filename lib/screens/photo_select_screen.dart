@@ -1,10 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../app_state.dart';
 import '../theme.dart';
+import '../widgets/photo_thumb.dart';
 import 'form_screen.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
@@ -43,11 +42,8 @@ class PhotoSelectScreen extends StatelessWidget {
           if (d.mainPath != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.file(File(d.mainPath!),
-                  height: 220,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  cacheWidth: 800),
+              child: PhotoThumb(d.mainPath!,
+                  height: 220, width: double.infinity, cacheWidth: 800),
             )
           else
             _EmptyPhoto(
@@ -77,11 +73,8 @@ class PhotoSelectScreen extends StatelessWidget {
                   Stack(children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.file(File(p),
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.cover,
-                          cacheWidth: 300),
+                      child: PhotoThumb(p,
+                          width: 100, height: 100, cacheWidth: 300),
                     ),
                     Positioned(
                       right: 0,

@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'ai_provider.dart';
@@ -52,6 +52,9 @@ class AnthropicProvider extends ChatAiProvider {
             // повторит запрос на рекомендованной запасной модели.
             'anthropic-beta': 'server-side-fallback-2026-07-01',
             'content-type': 'application/json',
+            // В браузере Anthropic требует явного согласия на прямой доступ
+            // (ключ пользователя хранится только в его браузере).
+            if (kIsWeb) 'anthropic-dangerous-direct-browser-access': 'true',
           },
           body: jsonEncode({
             'model': model,

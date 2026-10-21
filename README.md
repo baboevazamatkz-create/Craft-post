@@ -38,6 +38,13 @@ flutter pub get
 flutter build apk --release  # build/app/outputs/flutter-apk/app-release.apk
 ```
 
+## Веб-версия
+Тот же код собирается для браузера (`./tool/setup_web.sh && flutter build web`).
+Отличия от телефона: готовые фото скачиваются в «Загрузки» браузера,
+история постов хранится в IndexedDB браузера, ключ AI — в хранилище
+браузера. Публикуется вместе с сайтом на GitHub Pages в папке `/craft/`
+(workflow `deploy.yml`, только из ветки `main`).
+
 ## Установка на телефон
 1. Скопируйте `app-release.apk` на телефон.
 2. Откройте файл, разрешите «Установку из неизвестных источников».
