@@ -1,28 +1,72 @@
-import 'package:flutter/material.dart';
-
-/// Библиотека значков для инфографики. Сейчас — временные значки Material;
-/// реальные линейные значки заказчика заменят их (файлы PNG/SVG в assets/icons).
+/// Тонкие линейные значки (SVG-пути в сетке 24×24, только контур).
+/// Используются, когда AI не нарисовал свой значок; ключ подбирается по тексту.
 class IconSpec {
   final String key;
   final String label;
-  final IconData data;
-  const IconSpec(this.key, this.label, this.data);
+  final List<String> paths;
+  final List<String> words; // корни слов для автоподбора
+  const IconSpec(this.key, this.label, this.paths, [this.words = const []]);
 }
 
+const kPinPaths = [
+  'M12 21s-6-6.2-6-11a6 6 0 0 1 12 0c0 4.8-6 11-6 11z',
+  'M12 7.5a2.5 2.5 0 1 0 0 5a2.5 2.5 0 0 0 0-5z',
+];
+
 const kIcons = <IconSpec>[
-  IconSpec('day_night', 'День-ночь', Icons.brightness_4_outlined),
-  IconSpec('remote', 'Дистанционная настройка', Icons.settings_remote_outlined),
-  IconSpec('height', 'Работа на высоте', Icons.engineering_outlined),
-  IconSpec('cable', 'Кабельная линия', Icons.cable_outlined),
-  IconSpec('panel', 'Электрощит', Icons.electrical_services_outlined),
-  IconSpec('light', 'Освещение', Icons.lightbulb_outline),
-  IconSpec('camera', 'Видеонаблюдение', Icons.videocam_outlined),
-  IconSpec('safety', 'Безопасность', Icons.verified_user_outlined),
-  IconSpec('check', 'Проверка системы', Icons.fact_check_outlined),
-  IconSpec('timer', 'Сроки', Icons.timer_outlined),
-  IconSpec('bolt', 'Электричество', Icons.bolt_outlined),
-  IconSpec('tools', 'Монтаж', Icons.build_outlined),
+  IconSpec('bolt', 'Электричество', ['M13 2L5 14h6l-1 8 9-13h-6z'], ['электр', 'ток', 'мощност']),
+  IconSpec('day_night', 'День-ночь', [
+    'M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8z',
+    'M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4',
+  ], ['день', 'ночь', 'сумерк', 'датчик']),
+  IconSpec('remote', 'Дистанционная настройка', [
+    'M9 2.5h6a1 1 0 0 1 1 1v17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-17a1 1 0 0 1 1-1z',
+    'M10 7h4M10 11h4M10 15h4',
+  ], ['дистанц', 'пульт', 'удал', 'настройк', 'приложен']),
+  IconSpec('height', 'Работа на высоте', [
+    'M7 2.5v19M17 2.5v19M7 6.5h10M7 11.5h10M7 16.5h10',
+  ], ['высот', 'лестниц']),
+  IconSpec('ground', 'Заземление', ['M12 3v9M4.5 12h15M7 16h10M10 20h4'], ['заземл']),
+  IconSpec('shield', 'Надёжность и безопасность', [
+    'M12 3l8 3v6c0 5-3.5 8-8 9c-4.5-1-8-4-8-9V6z',
+    'M8.5 12l2.5 2.5l4.5-5',
+  ], ['безопас', 'надёж', 'надеж', 'защит', 'гарант', 'качеств']),
+  IconSpec('bulb', 'Освещение', [
+    'M9 18h6M10 21h4',
+    'M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z',
+  ], ['освещ', 'свет', 'ламп', 'подсвет']),
+  IconSpec('switch', 'Выключатель', ['M6 3h12v18H6z', 'M10 7h4v5h-4z'], ['выключ', 'управлен', 'розетк']),
+  IconSpec('stairs', 'Ступени', ['M3 20h5v-5h5v-5h5V5h3'], ['ступен', 'лестн']),
+  IconSpec('panel', 'Электрощит', [
+    'M4 3h16v18H4z',
+    'M4 9h16M4 15h16M8 6h.01M8 12h.01M8 18h.01M12 12h4',
+  ], ['щит', 'автомат', 'модул']),
+  IconSpec('cable', 'Кабель', [
+    'M9 2.5v5M15 2.5v5',
+    'M6 7.5h12v3.5a6 6 0 0 1-12 0z',
+    'M12 17v4.5',
+  ], ['кабел', 'провод', 'линия', 'линии', 'монтаж']),
+  IconSpec('camera', 'Видеонаблюдение', [
+    'M3 8h4l2-3h6l2 3h4v11H3z',
+    'M12 10.5a3 3 0 1 0 0 6a3 3 0 0 0 0-6z',
+  ], ['камер', 'видео', 'наблюден']),
+  IconSpec('timer', 'Сроки', [
+    'M12 4a8 8 0 1 0 0 16a8 8 0 0 0 0-16z',
+    'M12 8v5l3 2M9 2h6',
+  ], ['срок', 'быстр', 'день', 'дней', 'под ключ']),
+  IconSpec('tools', 'Монтаж', [
+    'M14.7 6.3a4 4 0 0 0 5 5L11 20a2.1 2.1 0 0 1-3-3z',
+  ], ['сбор', 'установ', 'ремонт']),
 ];
 
 IconSpec iconByKey(String key) =>
     kIcons.firstWhere((i) => i.key == key, orElse: () => kIcons.first);
+
+/// Подбирает значок по тексту подписи (когда AI не задал значок).
+String guessIcon(String text) {
+  final t = text.toLowerCase();
+  for (final i in kIcons) {
+    if (i.words.any(t.contains)) return i.key;
+  }
+  return 'bolt';
+}

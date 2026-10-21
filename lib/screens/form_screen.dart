@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/post_draft.dart';
 import '../widgets/busy.dart';
-import '../widgets/icon_dropdown.dart';
 import 'preview_screen.dart';
 
 class FormScreen extends StatefulWidget {
@@ -69,7 +68,7 @@ class _FormScreenState extends State<FormScreen> {
             ),
             const SizedBox(height: 14),
           ],
-          const Text('Преимущества на инфографике',
+          const Text('Преимущества (значки подберёт программа)',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           for (var i = 0; i < _feat.length; i++) ...[
@@ -77,11 +76,6 @@ class _FormScreenState extends State<FormScreen> {
               controller: _feat[i],
               style: const TextStyle(fontSize: 18),
               decoration: InputDecoration(labelText: 'Преимущество ${i + 1}', hintText: 'Автоматика день-ночь'),
-            ),
-            const SizedBox(height: 8),
-            IconDropdown(
-              value: context.read<AppState>().draft.features[i].icon,
-              onChanged: (v) => context.read<AppState>().draft.features[i].icon = v,
             ),
             const SizedBox(height: 16),
           ],

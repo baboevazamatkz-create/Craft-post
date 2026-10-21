@@ -2,27 +2,22 @@ import 'package:flutter/material.dart';
 
 import '../models/icon_library.dart';
 
+/// Выбор значка. `ai` — значок, нарисованный AI (если он есть).
 class IconDropdown extends StatelessWidget {
   final String value;
+  final bool hasAi;
   final ValueChanged<String> onChanged;
-  const IconDropdown({super.key, required this.value, required this.onChanged});
+  const IconDropdown({super.key, required this.value, required this.hasAi, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      initialValue: iconByKey(value).key,
+      initialValue: value == 'ai' && hasAi ? 'ai' : iconByKey(value).key,
       isExpanded: true,
       decoration: const InputDecoration(labelText: 'Значок'),
       items: [
-        for (final i in kIcons)
-          DropdownMenuItem(
-            value: i.key,
-            child: Row(children: [
-              Icon(i.data),
-              const SizedBox(width: 10),
-              Expanded(child: Text(i.label, overflow: TextOverflow.ellipsis)),
-            ]),
-          ),
+        if (hasAi) const DropdownMenuItem(value: 'ai', child: Text('Нарисован AI')),
+        for (final i in kIcons) DropdownMenuItem(value: i.key, child: Text(i.label)),
       ],
       onChanged: (v) => onChanged(v ?? value),
     );

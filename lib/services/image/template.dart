@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart' show IconData, Icons;
+import 'package:path_drawing/path_drawing.dart';
 import 'package:flutter/painting.dart';
 
 import '../../models/icon_library.dart';
@@ -23,6 +23,15 @@ class InfographicTemplate {
 
     _shade(canvas, w, h);
 
+    if (t.stat.trim().isNotEmpty) {
+      _text(t.stat, w * 0.19, 300, right - left, maxLines: 1)
+          .paint(canvas, Offset(left, h * 0.452));
+      if (t.unit.trim().isNotEmpty) {
+        _text(t.unit, w * 0.095, 300, right - left, maxLines: 1)
+            .paint(canvas, Offset(left, h * 0.612));
+      }
+    }
+
     final linePaint = Paint()
       ..color = _white.withValues(alpha: 0.75)
       ..strokeWidth = math.max(1, w * 0.0016);
@@ -39,8 +48,8 @@ class InfographicTemplate {
     for (var i = 0; i < math.min(kFeatureCount, t.features.length); i++) {
       final cx = w * (0.141 + 0.19 * i);
       final f = t.features[i];
-      final ip = _iconPainter(iconByKey(f.icon).data, w * 0.085);
-      ip.paint(canvas, Offset(cx - ip.width / 2, h * 0.835));
+      _icon(canvas, f.svg.isNotEmpty ? f.svg : iconByKey(f.icon).paths,
+          Offset(cx - w * 0.045, h * 0.835), w * 0.09);
       final cp = _text(f.text, w * 0.0185, 400, colW, align: TextAlign.center, maxLines: 2);
       cp.paint(canvas, Offset(cx - colW / 2, h * 0.9));
     }
@@ -50,8 +59,7 @@ class InfographicTemplate {
     final lx = right - lp.width;
     final ly = h * 0.924;
     lp.paint(canvas, Offset(lx, ly));
-    final pin = _iconPainter(Icons.location_on_outlined, w * 0.03);
-    pin.paint(canvas, Offset(lx - pin.width - w * 0.008, ly - w * 0.002));
+    _icon(canvas, kPinPaths, Offset(lx - w * 0.038, ly - w * 0.004), w * 0.03);
   }
 
   /// Затемнение: слева-сверху под логотип и снизу под текст.
@@ -77,18 +85,27 @@ class InfographicTemplate {
     );
   }
 
-  TextPainter _iconPainter(IconData icon, double size) => TextPainter(
-        text: TextSpan(
-          text: String.fromCharCode(icon.codePoint),
-          style: TextStyle(
-            fontFamily: icon.fontFamily,
-            package: icon.fontPackage,
-            fontSize: size,
-            color: _white,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
+  /// Тонкий линейный значок: пути в сетке 24×24 масштабируются до [size].
+  void _icon(ui.Canvas canvas, List<String> paths, Offset at, double size) {
+    final k = size / 24;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = _white
+      ..strokeWidth = math.max(1.0, size * 0.035) / k
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.save();
+    canvas.translate(at.dx, at.dy);
+    canvas.scale(k);
+    for (final d in paths) {
+      try {
+        canvas.drawPath(parseSvgPathData(d), paint);
+      } catch (_) {
+        // Некорректный путь от AI пропускаем.
+      }
+    }
+    canvas.restore();
+  }
 
   TextPainter _text(String s, double size, int weight, double maxW,
       {TextAlign align = TextAlign.left, int maxLines = 2}) {

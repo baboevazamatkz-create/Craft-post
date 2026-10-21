@@ -14,6 +14,8 @@ const kInfographicFields = <FieldSpec>[
   FieldSpec('object', 'Название объекта', hint: 'АЗС Magnum'),
   FieldSpec('work', 'Тип работ', hint: 'Подключение стелы'),
   FieldSpec('location', 'Локация', hint: 'Новая Джегута | КЧР'),
+  FieldSpec('stat', 'Крупная цифра (необязательно)', hint: '320'),
+  FieldSpec('unit', 'Единица (для цифры)', hint: 'м²'),
   FieldSpec('task', 'Задача (необязательно)', multiline: true),
   FieldSpec('done', 'Что сделано (по строке, необязательно)', multiline: true),
 ];
@@ -24,7 +26,8 @@ const kFeatureCount = 3;
 class Feature {
   String icon; // ключ из kIcons
   String text;
-  Feature(this.icon, this.text);
+  List<String> svg; // значок, нарисованный AI (пути 24×24); пусто — берётся icon
+  Feature(this.icon, this.text, [List<String>? svg]) : svg = svg ?? [];
 }
 
 /// Текст, который рисуется на главном фото. Редактируется на экране превью.
@@ -32,11 +35,15 @@ class InfographicText {
   String title;
   String subtitle;
   String location;
+  String stat; // крупная цифра, например «320»
+  String unit; // единица под цифрой, например «м²»
   List<Feature> features;
   InfographicText({
     this.title = '',
     this.subtitle = '',
     this.location = '',
+    this.stat = '',
+    this.unit = '',
     List<Feature>? features,
   }) : features = features ?? [];
 }

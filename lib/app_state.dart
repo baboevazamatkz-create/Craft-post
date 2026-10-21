@@ -51,7 +51,9 @@ class AppState extends ChangeNotifier {
     final result = await ai.generate(
         mainPhotoJpeg: photo, fields: draft.fields, features: draft.features);
     draft.caption = result.caption;
-    draft.infographic = result.infographic;
+    draft.infographic = result.infographic
+      ..stat = draft.fields['stat'] ?? ''
+      ..unit = draft.fields['unit'] ?? '';
     await refreshPreviews();
   }
 

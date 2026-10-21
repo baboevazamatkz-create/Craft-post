@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../../models/post_draft.dart';
+import '../../models/icon_library.dart';
 import 'ai_provider.dart';
 
 /// Работает без сети и ключа: собирает текст из полей формы.
@@ -20,7 +21,7 @@ class StubAiProvider implements AiProvider {
     String f(String k) => (fields[k] ?? '').trim();
     final done = f('done').split('\n').where((l) => l.trim().isNotEmpty).map((l) => ' ▪ ${l.trim()}');
     final caption = [
-      '🔷 ${f('object')}',
+      '🔷 ${[f('object'), f('stat'), f('unit')].where((e) => e.isNotEmpty).join(' ')}',
       if (f('task').isNotEmpty) '❗ Задача — ${f('task')}',
       if (f('work').isNotEmpty && f('task').isEmpty) '❗ Задача — ${f('work').toLowerCase()}.',
       if (done.isNotEmpty) '✔️ Что было сделано:\n${done.join('\n')}',
@@ -31,7 +32,7 @@ class StubAiProvider implements AiProvider {
         title: f('object'),
         subtitle: f('work'),
         location: f('location'),
-        features: [for (final x in features) Feature(x.icon, x.text)],
+        features: [for (final x in features) Feature(guessIcon(x.text), x.text)],
       ),
     );
   }

@@ -15,9 +15,10 @@ class PreviewScreen extends StatefulWidget {
 }
 
 class _PreviewScreenState extends State<PreviewScreen> {
-  late final TextEditingController _caption, _title, _subtitle, _location;
+  late final TextEditingController _caption, _title, _subtitle, _location, _stat, _unit;
   late final List<TextEditingController> _feat;
   late final List<String> _icons;
+  late final List<List<String>> _svgs;
 
   @override
   void initState() {
@@ -27,13 +28,16 @@ class _PreviewScreenState extends State<PreviewScreen> {
     _title = TextEditingController(text: d.infographic.title);
     _subtitle = TextEditingController(text: d.infographic.subtitle);
     _location = TextEditingController(text: d.infographic.location);
+    _stat = TextEditingController(text: d.infographic.stat);
+    _unit = TextEditingController(text: d.infographic.unit);
     _feat = [for (final f in d.infographic.features) TextEditingController(text: f.text)];
-    _icons = [for (final f in d.infographic.features) f.icon];
+    _icons = [for (final f in d.infographic.features) f.svg.isNotEmpty ? 'ai' : f.icon];
+    _svgs = [for (final f in d.infographic.features) f.svg];
   }
 
   @override
   void dispose() {
-    for (final c in [_caption, _title, _subtitle, _location, ..._feat]) {
+    for (final c in [_caption, _title, _subtitle, _location, _stat, _unit, ..._feat]) {
       c.dispose();
     }
     super.dispose();
@@ -47,8 +51,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
       ..title = _title.text
       ..subtitle = _subtitle.text
       ..location = _location.text
+      ..stat = _stat.text
+      ..unit = _unit.text
       ..features = [
-        for (var i = 0; i < _feat.length; i++) Feature(_icons[i], _feat[i].text),
+        for (var i = 0; i < _feat.length; i++) _icons[i] == 'ai'
+            ? Feature('bolt', _feat[i].text, _svgs[i])
+            : Feature(_icons[i], _feat[i].text),
       ];
   }
 
@@ -89,11 +97,16 @@ class _PreviewScreenState extends State<PreviewScreen> {
           _field(_title, 'Заголовок'),
           _field(_subtitle, 'Подзаголовок'),
           _field(_location, 'Локация'),
+          Row(children: [
+            Expanded(child: _field(_stat, 'Крупная цифра')),
+            const SizedBox(width: 8),
+            Expanded(child: _field(_unit, 'Единица')),
+          ]),
           for (var i = 0; i < _feat.length; i++) ...[
             _field(_feat[i], 'Преимущество ${i + 1}'),
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: IconDropdown(value: _icons[i], onChanged: (v) => _icons[i] = v),
+              child: IconDropdown(value: _icons[i], hasAi: _svgs[i].isNotEmpty, onChanged: (v) => _icons[i] = v),
             ),
           ],
           OutlinedButton.icon(
