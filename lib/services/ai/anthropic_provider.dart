@@ -80,8 +80,9 @@ class AnthropicProvider implements AiProvider {
     if (status == 400 && msg.toLowerCase().contains('credit')) {
       return 'На счёте Anthropic закончились средства. Пополните баланс в console.anthropic.com.';
     }
-    if (status == 429)
+    if (status == 429) {
       return 'Слишком много запросов. Подождите минуту и повторите.';
+    }
     if (status >= 500) return 'Сервис AI временно недоступен. Повторите позже.';
     return 'AI: ошибка $status. $msg';
   }
