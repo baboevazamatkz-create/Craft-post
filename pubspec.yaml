@@ -27,6 +27,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+    - assets/overlays/
   fonts:
     - family: Cormorant
       fonts:

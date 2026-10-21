@@ -13,7 +13,7 @@ import 'template.dart';
 class ImageProcessor {
   final InfographicTemplate template;
   final LogoPlacement logoPlacement;
-  ui.Image? _logo;
+  final _assets = <String, ui.Image>{};
 
   ImageProcessor({
     InfographicTemplate? template,
@@ -27,12 +27,25 @@ class ImageProcessor {
     return frame.image;
   }
 
-  Future<ui.Image> _loadLogo() async {
-    if (_logo != null) return _logo!;
-    final data = await rootBundle.load('assets/logo.png');
+  Future<ui.Image> _asset(String name) async {
+    final cached = _assets[name];
+    if (cached != null) return cached;
+    final data = await rootBundle.load(name);
     final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
-    _logo = (await codec.getNextFrame()).image;
-    return _logo!;
+    return _assets[name] = (await codec.getNextFrame()).image;
+  }
+
+  Future<ui.Image> _loadLogo() => _asset('assets/logo.png');
+
+  /// Маска затемнения (чёрный + альфа), растягивается на весь кадр.
+  /// Снята из пар скриншотов Canva «с затемнением / без» (tool/overlays).
+  void _drawShade(ui.Canvas c, Size s, ui.Image mask) {
+    c.drawImageRect(
+      mask,
+      ui.Rect.fromLTWH(0, 0, mask.width.toDouble(), mask.height.toDouble()),
+      ui.Rect.fromLTWH(0, 0, s.width, s.height),
+      ui.Paint()..filterQuality = ui.FilterQuality.medium,
+    );
   }
 
   Size _target(ui.Image src, int? maxSide) {
@@ -78,7 +91,9 @@ class ImageProcessor {
   Future<Uint8List> renderMain(String path, InfographicText t,
       {int? maxSide, int quality = 92}) async {
     final logo = await _loadLogo();
+    final shade = await _asset('assets/overlays/main_shade.png');
     final image = await _draw(path, maxSide, (c, s) async {
+      _drawShade(c, s, shade);
       template.paint(c, s, t);
       _drawLogo(c, s, logo);
     });
@@ -89,8 +104,9 @@ class ImageProcessor {
   Future<Uint8List> renderOther(String path,
       {int? maxSide, int quality = 92}) async {
     final logo = await _loadLogo();
+    final shade = await _asset('assets/overlays/other_shade.png');
     final image = await _draw(path, maxSide, (c, s) async {
-      paintCornerShade(c, s);
+      _drawShade(c, s, shade);
       _drawLogo(c, s, logo);
     });
     return _toJpeg(image, quality);
