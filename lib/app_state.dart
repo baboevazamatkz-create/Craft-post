@@ -5,21 +5,32 @@ import 'models/post_draft.dart';
 import 'services/ai/ai_factory.dart';
 import 'services/gallery_saver.dart';
 import 'services/image/image_processor.dart';
+import 'services/post_store.dart';
 import 'services/settings_service.dart';
 
 const kPreviewSide = 900;
 
+enum SaveState { none, queued, saving, saved, error }
+
 class AppState extends ChangeNotifier {
   final settings = SettingsService();
   final processor = ImageProcessor();
+  final store = PostStore();
   final _picker = ImagePicker();
   final _saver = GallerySaver();
 
   PostDraft draft = PostDraft();
 
+  /// Состояние фонового сохранения каждой картинки (индекс как в [PostDraft]).
+  List<SaveState> saveStates = [];
+  String? lastSaveError;
+  Future<void> _queue = Future.value();
+
   Future<void> pickMain() async {
     final f = await _picker.pickImage(source: ImageSource.gallery);
     if (f == null) return;
+    // Новое главное фото у поста из истории — это уже новый пост.
+    if (draft.id != null) reset();
     draft.mainPath = f.path;
     draft.otherPaths.remove(f.path);
     notifyListeners();
@@ -40,10 +51,13 @@ class AppState extends ChangeNotifier {
 
   void reset() {
     draft = PostDraft();
+    saveStates = [];
+    lastSaveError = null;
     notifyListeners();
   }
 
-  /// Шаг «Создать»: AI (главное фото + поля) и превью всех фото.
+  /// Шаг «Создать»: AI (главное фото + поля), превью всех фото
+  /// и запись поста в историю приложения.
   Future<void> generate() async {
     final providerId = await settings.provider();
     final ai = createAiProvider(providerId, await settings.apiKey());
@@ -54,9 +68,13 @@ class AppState extends ChangeNotifier {
     draft.infographic = result.infographic
       ..stat = draft.fields['stat'] ?? ''
       ..unit = draft.fields['unit'] ?? '';
+    draft.saved = List.filled(draft.imageCount, false);
+    saveStates = List.filled(draft.imageCount, SaveState.none);
     await refreshPreviews();
   }
 
+  /// Перерисовывает превью и обновляет пост в истории. Главное фото после
+  /// правок текста считается несохранённым.
   Future<void> refreshPreviews() async {
     draft.mainPreview = await processor.renderMain(
         draft.mainPath!, draft.infographic,
@@ -65,26 +83,89 @@ class AppState extends ChangeNotifier {
       for (final p in draft.otherPaths)
         await processor.renderOther(p, maxSide: kPreviewSide, quality: 75),
     ];
+    _syncStates();
+    if (saveStates[0] == SaveState.saved || saveStates[0] == SaveState.error) {
+      saveStates[0] = SaveState.none;
+      draft.saved[0] = false;
+    }
+    await store.save(draft);
     notifyListeners();
   }
 
-  /// Финальный экспорт в полном разрешении. Файлы обрабатываются по одному,
-  /// чтобы не держать в памяти все фото сразу.
-  Future<void> saveAll(void Function(int done, int total) onProgress) async {
-    if (!await _saver.ensureAccess()) {
-      throw Exception('Нет разрешения на сохранение в галерею');
+  void _syncStates() {
+    final n = draft.imageCount;
+    draft.saved = [for (var i = 0; i < n; i++) draft.isSaved(i)];
+    saveStates = [
+      for (var i = 0; i < n; i++)
+        i < saveStates.length && saveStates[i] != SaveState.saved
+            ? saveStates[i]
+            : (draft.saved[i] ? SaveState.saved : SaveState.none),
+    ];
+  }
+
+  /// Ставит картинку в очередь на сохранение в галерею (полное разрешение).
+  /// Очередь обрабатывает по одной картинке, пока пользователь листает дальше.
+  void approve(int i) {
+    final s = saveStates[i];
+    if (s == SaveState.queued ||
+        s == SaveState.saving ||
+        s == SaveState.saved) {
+      return;
     }
-    final total = 1 + draft.otherPaths.length;
-    final stamp = DateTime.now().millisecondsSinceEpoch;
-    onProgress(0, total);
-    Uint8List jpg =
-        await processor.renderMain(draft.mainPath!, draft.infographic);
-    await _saver.save(jpg, 'craft_${stamp}_1_main');
-    onProgress(1, total);
-    for (var i = 0; i < draft.otherPaths.length; i++) {
-      jpg = await processor.renderOther(draft.otherPaths[i]);
-      await _saver.save(jpg, 'craft_${stamp}_${i + 2}');
-      onProgress(i + 2, total);
+    saveStates[i] = SaveState.queued;
+    notifyListeners();
+    final post = draft;
+    _queue = _queue.then((_) => _saveOne(post, i));
+  }
+
+  Future<void> _saveOne(PostDraft post, int i) async {
+    final current = identical(post, draft);
+    void set(SaveState s) {
+      if (identical(post, draft)) {
+        saveStates[i] = s;
+        notifyListeners();
+      }
     }
+
+    try {
+      if (!await _saver.ensureAccess()) {
+        throw Exception('Нет разрешения на сохранение в галерею');
+      }
+      set(SaveState.saving);
+      final jpg = i == 0
+          ? await processor.renderMain(post.mainPath!, post.infographic)
+          : await processor.renderOther(post.otherPaths[i - 1]);
+      await _saver.save(jpg, 'craft_${post.id ?? 'post'}_${i + 1}');
+      if (i < post.saved.length) post.saved[i] = true;
+      await store.save(post, previews: false);
+      set(SaveState.saved);
+    } catch (e) {
+      lastSaveError = '$e';
+      set(SaveState.error);
+    }
+    if (!current) notifyListeners();
+  }
+
+  int countState(Set<SaveState> states) =>
+      saveStates.where(states.contains).length;
+
+  Future<List<PostSummary>> history() => store.list();
+
+  Future<void> openPost(String id) async {
+    draft = await store.load(id);
+    saveStates = [
+      for (var i = 0; i < draft.imageCount; i++)
+        draft.isSaved(i) ? SaveState.saved : SaveState.none
+    ];
+    if (draft.previews.length != draft.imageCount) {
+      await refreshPreviews();
+    }
+    notifyListeners();
+  }
+
+  Future<void> deletePost(String id) async {
+    await store.delete(id);
+    if (draft.id == id) reset();
+    notifyListeners();
   }
 }

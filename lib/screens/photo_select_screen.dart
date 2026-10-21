@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../theme.dart';
 import 'form_screen.dart';
+import 'history_screen.dart';
 import 'settings_screen.dart';
 
 class PhotoSelectScreen extends StatelessWidget {
@@ -19,6 +20,12 @@ class PhotoSelectScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('1. Выбор фото'),
         actions: [
+          IconButton(
+            tooltip: 'Мои посты',
+            icon: const Icon(Icons.history),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const HistoryScreen())),
+          ),
           IconButton(
             tooltip: 'Настройки',
             icon: const Icon(Icons.settings),

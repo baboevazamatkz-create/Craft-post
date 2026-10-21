@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -5,7 +7,8 @@ import '../app_state.dart';
 import '../models/post_draft.dart';
 import '../widgets/busy.dart';
 import '../widgets/icon_dropdown.dart';
-import 'save_screen.dart';
+import '../widgets/image_viewer.dart';
+import 'review_screen.dart';
 
 class PreviewScreen extends StatefulWidget {
   const PreviewScreen({super.key});
@@ -91,31 +94,38 @@ class _PreviewScreenState extends State<PreviewScreen> {
         context, 'Обновляю превью…', context.read<AppState>().refreshPreviews);
     if (ok && mounted) {
       Navigator.push(
-          context, MaterialPageRoute(builder: (_) => const SaveScreen()));
+          context, MaterialPageRoute(builder: (_) => const ReviewScreen()));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final d = context.watch<AppState>().draft;
+    final s = context.watch<AppState>();
+    final d = s.draft;
+    final all = d.previews;
     return Scaffold(
       appBar: AppBar(title: const Text('3. Превью и правки')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (d.mainPreview != null) _preview(d.mainPreview!),
+          if (all.isNotEmpty) _preview(s, all, 0),
           const SizedBox(height: 8),
           SizedBox(
             height: 140,
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
-                for (final b in d.otherPreviews)
+                for (var i = 1; i < all.length; i++)
                   Padding(
                       padding: const EdgeInsets.only(right: 8),
-                      child: _preview(b))
+                      child: _preview(s, all, i))
               ],
             ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: 6),
+            child: Text('Нажмите на фото, чтобы открыть и увеличить',
+                style: TextStyle(fontSize: 13)),
           ),
           const SizedBox(height: 16),
           const Text('Инфографика',
@@ -162,10 +172,47 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
-  Widget _preview(dynamic bytes) => ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.memory(bytes, fit: BoxFit.cover),
-      );
+  /// Фото в превью: главное — во всю ширину (3:4), остальные — миниатюры.
+  /// Нажатие открывает полноэкранный просмотр с увеличением.
+  Widget _preview(AppState s, List<Uint8List> all, int i) {
+    final img = ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.memory(all[i], fit: BoxFit.cover),
+    );
+    return GestureDetector(
+      onTap: () => openViewer(context, all, i),
+      child: SizedBox(
+        width: i == 0 ? double.infinity : 105,
+        child: AspectRatio(
+          aspectRatio: 3 / 4,
+          child: Stack(fit: StackFit.expand, children: [
+            img,
+            Positioned(
+              right: 6,
+              bottom: 6,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(8)),
+                child: const Icon(Icons.zoom_in, color: Colors.white, size: 20),
+              ),
+            ),
+            if (i < s.saveStates.length && s.saveStates[i] == SaveState.saved)
+              const Positioned(
+                left: 6,
+                top: 6,
+                child: CircleAvatar(
+                  radius: 13,
+                  backgroundColor: Color(0xFF2E9E5B),
+                  child: Icon(Icons.check, color: Colors.white, size: 16),
+                ),
+              ),
+          ]),
+        ),
+      ),
+    );
+  }
 
   Widget _field(TextEditingController c, String label) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
