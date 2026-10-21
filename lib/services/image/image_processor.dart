@@ -1,0 +1,117 @@
+import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:image/image.dart' as img;
+
+import '../../models/post_draft.dart';
+import 'template.dart';
+
+/// Вся обработка фото на устройстве. `maxSide == null` — полное разрешение.
+class ImageProcessor {
+  final InfographicTemplate template;
+  final LogoPlacement logoPlacement;
+  ui.Image? _logo;
+
+  ImageProcessor({
+    InfographicTemplate? template,
+    this.logoPlacement = const LogoPlacement(),
+  }) : template = template ?? InfographicTemplate();
+
+  Future<ui.Image> _decode(String path) async {
+    final bytes = await File(path).readAsBytes();
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    return frame.image;
+  }
+
+  Future<ui.Image> _loadLogo() async {
+    if (_logo != null) return _logo!;
+    final data = await rootBundle.load('assets/logo.png');
+    final codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+    _logo = (await codec.getNextFrame()).image;
+    return _logo!;
+  }
+
+  Size _target(ui.Image src, int? maxSide) {
+    final w = src.width.toDouble();
+    final h = src.height.toDouble();
+    if (maxSide == null) return Size(w, h);
+    final k = math.min(1.0, maxSide / math.max(w, h));
+    return Size((w * k).roundToDouble(), (h * k).roundToDouble());
+  }
+
+  Future<ui.Image> _draw(
+    String path,
+    int? maxSide,
+    Future<void> Function(ui.Canvas canvas, Size size) overlay,
+  ) async {
+    final src = await _decode(path);
+    final size = _target(src, maxSide);
+    final rec = ui.PictureRecorder();
+    final canvas = ui.Canvas(rec);
+    canvas.drawImageRect(
+      src,
+      ui.Rect.fromLTWH(0, 0, src.width.toDouble(), src.height.toDouble()),
+      ui.Rect.fromLTWH(0, 0, size.width, size.height),
+      ui.Paint()..filterQuality = ui.FilterQuality.high,
+    );
+    await overlay(canvas, size);
+    final out = await rec.endRecording().toImage(size.width.toInt(), size.height.toInt());
+    src.dispose();
+    return out;
+  }
+
+  Future<Uint8List> _toJpeg(ui.Image image, int quality) async {
+    final bd = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    final w = image.width, h = image.height;
+    image.dispose();
+    return compute(_encodeJpg, _JpgJob(bd!.buffer.asUint8List(), w, h, quality));
+  }
+
+  /// Главное фото с инфографикой.
+  Future<Uint8List> renderMain(String path, InfographicText t,
+      {int? maxSide, int quality = 92}) async {
+    final image = await _draw(path, maxSide, (c, s) async => template.paint(c, s, t));
+    return _toJpeg(image, quality);
+  }
+
+  /// Остальные фото с логотипом.
+  Future<Uint8List> renderOther(String path, {int? maxSide, int quality = 92}) async {
+    final logo = await _loadLogo();
+    final image = await _draw(path, maxSide, (c, s) async {
+      final dst = logoPlacement.rect(s, Size(logo.width.toDouble(), logo.height.toDouble()));
+      c.drawImageRect(
+        logo,
+        ui.Rect.fromLTWH(0, 0, logo.width.toDouble(), logo.height.toDouble()),
+        dst,
+        ui.Paint()..filterQuality = ui.FilterQuality.high,
+      );
+    });
+    return _toJpeg(image, quality);
+  }
+
+  /// Маленький JPEG без наложений — для отправки в AI.
+  Future<Uint8List> aiPhoto(String path) async {
+    final image = await _draw(path, 1024, (c, s) async {});
+    return _toJpeg(image, 80);
+  }
+}
+
+class _JpgJob {
+  final Uint8List rgba;
+  final int w, h, quality;
+  _JpgJob(this.rgba, this.w, this.h, this.quality);
+}
+
+Uint8List _encodeJpg(_JpgJob j) {
+  final im = img.Image.fromBytes(
+    width: j.w,
+    height: j.h,
+    bytes: j.rgba.buffer,
+    numChannels: 4,
+  );
+  return Uint8List.fromList(img.encodeJpg(im, quality: j.quality));
+}
