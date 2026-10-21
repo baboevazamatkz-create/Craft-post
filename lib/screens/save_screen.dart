@@ -62,8 +62,9 @@ class _SaveScreenState extends State<SaveScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: Text(_error!,
-                    style:
-                        const TextStyle(color: Colors.redAccent, fontSize: 16)),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 16)),
               ),
             if (_finished) ...[
               const SizedBox(height: 16),

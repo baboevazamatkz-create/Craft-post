@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../app_state.dart';
+import '../theme.dart';
 import 'form_screen.dart';
 import 'settings_screen.dart';
 
@@ -34,12 +35,19 @@ class PhotoSelectScreen extends StatelessWidget {
           const SizedBox(height: 8),
           if (d.mainPath != null)
             ClipRRect(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               child: Image.file(File(d.mainPath!),
                   height: 220,
                   width: double.infinity,
                   fit: BoxFit.cover,
                   cacheWidth: 800),
+            )
+          else
+            _EmptyPhoto(
+              icon: Icons.add_photo_alternate_outlined,
+              text: 'Нажмите, чтобы выбрать фото',
+              height: 180,
+              onTap: s.pickMain,
             ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
@@ -61,7 +69,7 @@ class PhotoSelectScreen extends StatelessWidget {
                 for (final p in d.otherPaths)
                   Stack(children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       child: Image.file(File(p),
                           width: 100,
                           height: 100,
@@ -75,12 +83,20 @@ class PhotoSelectScreen extends StatelessWidget {
                         onTap: () => s.removeOther(p),
                         child: const CircleAvatar(
                             radius: 14,
-                            backgroundColor: Colors.black87,
-                            child: Icon(Icons.close, size: 16)),
+                            backgroundColor: Colors.white,
+                            child:
+                                Icon(Icons.close, size: 16, color: Brand.blue)),
                       ),
                     ),
                   ]),
               ],
+            )
+          else
+            _EmptyPhoto(
+              icon: Icons.photo_library_outlined,
+              text: 'Можно выбрать сразу несколько',
+              height: 110,
+              onTap: s.pickOthers,
             ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
@@ -99,6 +115,47 @@ class PhotoSelectScreen extends StatelessWidget {
             child: const Text('Далее'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Пустая голубая плашка-подсказка на месте фото.
+class _EmptyPhoto extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final double height;
+  final VoidCallback onTap;
+  const _EmptyPhoto(
+      {required this.icon,
+      required this.text,
+      required this.height,
+      required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Brand.tint,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Brand.border, width: 1.5),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 44, color: Brand.sky),
+              const SizedBox(height: 8),
+              Text(text,
+                  style: const TextStyle(color: Brand.deep, fontSize: 15)),
+            ],
+          ),
+        ),
       ),
     );
   }
