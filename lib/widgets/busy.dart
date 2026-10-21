@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 /// Показывает индикатор на время [task]; ошибки выводит снэкбаром.
 /// Возвращает true, если задача завершилась без ошибки.
-Future<bool> runBusy(BuildContext context, String message, Future<void> Function() task) async {
+Future<bool> runBusy(
+    BuildContext context, String message, Future<void> Function() task) async {
   final nav = Navigator.of(context, rootNavigator: true);
   final messenger = ScaffoldMessenger.of(context);
   showDialog<void>(

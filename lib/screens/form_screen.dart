@@ -22,9 +22,12 @@ class _FormScreenState extends State<FormScreen> {
     super.initState();
     final draft = context.read<AppState>().draft;
     final saved = draft.fields;
-    _feat = [for (final f in draft.features) TextEditingController(text: f.text)];
+    _feat = [
+      for (final f in draft.features) TextEditingController(text: f.text)
+    ];
     _c = {
-      for (final f in kInfographicFields) f.key: TextEditingController(text: saved[f.key] ?? ''),
+      for (final f in kInfographicFields)
+        f.key: TextEditingController(text: saved[f.key] ?? ''),
     };
   }
 
@@ -46,7 +49,8 @@ class _FormScreenState extends State<FormScreen> {
     }
     final ok = await runBusy(context, 'Готовлю пост…', s.generate);
     if (ok && mounted) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PreviewScreen()));
+      Navigator.push(
+          context, MaterialPageRoute(builder: (_) => const PreviewScreen()));
     }
   }
 
@@ -75,7 +79,9 @@ class _FormScreenState extends State<FormScreen> {
             TextField(
               controller: _feat[i],
               style: const TextStyle(fontSize: 18),
-              decoration: InputDecoration(labelText: 'Преимущество ${i + 1}', hintText: 'Автоматика день-ночь'),
+              decoration: InputDecoration(
+                  labelText: 'Преимущество ${i + 1}',
+                  hintText: 'Автоматика день-ночь'),
             ),
             const SizedBox(height: 16),
           ],

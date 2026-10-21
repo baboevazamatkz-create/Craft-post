@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -29,7 +28,8 @@ class AppState extends ChangeNotifier {
   Future<void> pickOthers() async {
     final files = await _picker.pickMultiImage();
     if (files.isEmpty) return;
-    draft.otherPaths = files.map((f) => f.path).where((p) => p != draft.mainPath).toList();
+    draft.otherPaths =
+        files.map((f) => f.path).where((p) => p != draft.mainPath).toList();
     notifyListeners();
   }
 
@@ -59,7 +59,8 @@ class AppState extends ChangeNotifier {
 
   Future<void> refreshPreviews() async {
     draft.mainPreview = await processor.renderMain(
-        draft.mainPath!, draft.infographic, maxSide: kPreviewSide, quality: 75);
+        draft.mainPath!, draft.infographic,
+        maxSide: kPreviewSide, quality: 75);
     draft.otherPreviews = [
       for (final p in draft.otherPaths)
         await processor.renderOther(p, maxSide: kPreviewSide, quality: 75),
@@ -76,7 +77,8 @@ class AppState extends ChangeNotifier {
     final total = 1 + draft.otherPaths.length;
     final stamp = DateTime.now().millisecondsSinceEpoch;
     onProgress(0, total);
-    Uint8List jpg = await processor.renderMain(draft.mainPath!, draft.infographic);
+    Uint8List jpg =
+        await processor.renderMain(draft.mainPath!, draft.infographic);
     await _saver.save(jpg, 'craft_${stamp}_1_main');
     onProgress(1, total);
     for (var i = 0; i < draft.otherPaths.length; i++) {

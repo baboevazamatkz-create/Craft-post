@@ -6,7 +6,8 @@ class FieldSpec {
   final String label;
   final String hint;
   final bool multiline;
-  const FieldSpec(this.key, this.label, {this.hint = '', this.multiline = false});
+  const FieldSpec(this.key, this.label,
+      {this.hint = '', this.multiline = false});
 }
 
 /// Текстовые поля формы (значки преимуществ — отдельно, см. [kFeatureCount]).
@@ -26,7 +27,8 @@ const kFeatureCount = 3;
 class Feature {
   String icon; // ключ из kIcons
   String text;
-  List<String> svg; // значок, нарисованный AI (пути 24×24); пусто — берётся icon
+  List<String>
+      svg; // значок, нарисованный AI (пути 24×24); пусто — берётся icon
   Feature(this.icon, this.text, [List<String>? svg]) : svg = svg ?? [];
 }
 

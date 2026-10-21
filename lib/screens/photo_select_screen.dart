@@ -21,8 +21,8 @@ class PhotoSelectScreen extends StatelessWidget {
           IconButton(
             tooltip: 'Настройки',
             icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.push(
-                context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen())),
           ),
         ],
       ),
@@ -36,13 +36,18 @@ class PhotoSelectScreen extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.file(File(d.mainPath!),
-                  height: 220, width: double.infinity, fit: BoxFit.cover, cacheWidth: 800),
+                  height: 220,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  cacheWidth: 800),
             ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: s.pickMain,
             icon: const Icon(Icons.photo),
-            label: Text(d.mainPath == null ? 'Выбрать главное фото' : 'Заменить главное фото'),
+            label: Text(d.mainPath == null
+                ? 'Выбрать главное фото'
+                : 'Заменить главное фото'),
           ),
           const SizedBox(height: 24),
           const Text('Остальные фото (с логотипом)',
@@ -57,7 +62,11 @@ class PhotoSelectScreen extends StatelessWidget {
                   Stack(children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(File(p), width: 100, height: 100, fit: BoxFit.cover, cacheWidth: 300),
+                      child: Image.file(File(p),
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                          cacheWidth: 300),
                     ),
                     Positioned(
                       right: 0,
@@ -65,7 +74,9 @@ class PhotoSelectScreen extends StatelessWidget {
                       child: InkWell(
                         onTap: () => s.removeOther(p),
                         child: const CircleAvatar(
-                            radius: 14, backgroundColor: Colors.black87, child: Icon(Icons.close, size: 16)),
+                            radius: 14,
+                            backgroundColor: Colors.black87,
+                            child: Icon(Icons.close, size: 16)),
                       ),
                     ),
                   ]),
@@ -75,14 +86,16 @@ class PhotoSelectScreen extends StatelessWidget {
           OutlinedButton.icon(
             onPressed: s.pickOthers,
             icon: const Icon(Icons.photo_library),
-            label: Text(d.otherPaths.isEmpty ? 'Выбрать остальные фото' : 'Изменить выбор'),
+            label: Text(d.otherPaths.isEmpty
+                ? 'Выбрать остальные фото'
+                : 'Изменить выбор'),
           ),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: d.mainPath == null
                 ? null
-                : () => Navigator.push(
-                    context, MaterialPageRoute(builder: (_) => const FormScreen())),
+                : () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const FormScreen())),
             child: const Text('Далее'),
           ),
         ],

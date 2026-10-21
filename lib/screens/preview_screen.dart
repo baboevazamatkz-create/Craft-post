@@ -15,7 +15,12 @@ class PreviewScreen extends StatefulWidget {
 }
 
 class _PreviewScreenState extends State<PreviewScreen> {
-  late final TextEditingController _caption, _title, _subtitle, _location, _stat, _unit;
+  late final TextEditingController _caption,
+      _title,
+      _subtitle,
+      _location,
+      _stat,
+      _unit;
   late final List<TextEditingController> _feat;
   late final List<String> _icons;
   late final List<List<String>> _svgs;
@@ -30,14 +35,27 @@ class _PreviewScreenState extends State<PreviewScreen> {
     _location = TextEditingController(text: d.infographic.location);
     _stat = TextEditingController(text: d.infographic.stat);
     _unit = TextEditingController(text: d.infographic.unit);
-    _feat = [for (final f in d.infographic.features) TextEditingController(text: f.text)];
-    _icons = [for (final f in d.infographic.features) f.svg.isNotEmpty ? 'ai' : f.icon];
+    _feat = [
+      for (final f in d.infographic.features)
+        TextEditingController(text: f.text)
+    ];
+    _icons = [
+      for (final f in d.infographic.features) f.svg.isNotEmpty ? 'ai' : f.icon
+    ];
     _svgs = [for (final f in d.infographic.features) f.svg];
   }
 
   @override
   void dispose() {
-    for (final c in [_caption, _title, _subtitle, _location, _stat, _unit, ..._feat]) {
+    for (final c in [
+      _caption,
+      _title,
+      _subtitle,
+      _location,
+      _stat,
+      _unit,
+      ..._feat
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -54,15 +72,17 @@ class _PreviewScreenState extends State<PreviewScreen> {
       ..stat = _stat.text
       ..unit = _unit.text
       ..features = [
-        for (var i = 0; i < _feat.length; i++) _icons[i] == 'ai'
-            ? Feature('bolt', _feat[i].text, _svgs[i])
-            : Feature(_icons[i], _feat[i].text),
+        for (var i = 0; i < _feat.length; i++)
+          _icons[i] == 'ai'
+              ? Feature('bolt', _feat[i].text, _svgs[i])
+              : Feature(_icons[i], _feat[i].text),
       ];
   }
 
   Future<void> _refresh() async {
     _apply();
-    await runBusy(context, 'Обновляю превью…', context.read<AppState>().refreshPreviews);
+    await runBusy(
+        context, 'Обновляю превью…', context.read<AppState>().refreshPreviews);
   }
 
   Future<void> _approve() async {
@@ -70,7 +90,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
     final ok = await runBusy(
         context, 'Обновляю превью…', context.read<AppState>().refreshPreviews);
     if (ok && mounted) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const SaveScreen()));
+      Navigator.push(
+          context, MaterialPageRoute(builder: (_) => const SaveScreen()));
     }
   }
 
@@ -88,11 +109,17 @@ class _PreviewScreenState extends State<PreviewScreen> {
             height: 140,
             child: ListView(
               scrollDirection: Axis.horizontal,
-              children: [for (final b in d.otherPreviews) Padding(padding: const EdgeInsets.only(right: 8), child: _preview(b))],
+              children: [
+                for (final b in d.otherPreviews)
+                  Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _preview(b))
+              ],
             ),
           ),
           const SizedBox(height: 16),
-          const Text('Инфографика', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+          const Text('Инфографика',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           _field(_title, 'Заголовок'),
           _field(_subtitle, 'Подзаголовок'),
@@ -106,7 +133,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
             _field(_feat[i], 'Преимущество ${i + 1}'),
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: IconDropdown(value: _icons[i], hasAi: _svgs[i].isNotEmpty, onChanged: (v) => _icons[i] = v),
+              child: IconDropdown(
+                  value: _icons[i],
+                  hasAi: _svgs[i].isNotEmpty,
+                  onChanged: (v) => _icons[i] = v),
             ),
           ],
           OutlinedButton.icon(
@@ -115,7 +145,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
             label: const Text('Обновить превью'),
           ),
           const SizedBox(height: 16),
-          const Text('Подпись к посту', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+          const Text('Подпись к посту',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           TextField(
             controller: _caption,
@@ -138,6 +169,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   Widget _field(TextEditingController c, String label) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
-        child: TextField(controller: c, decoration: InputDecoration(labelText: label)),
+        child: TextField(
+            controller: c, decoration: InputDecoration(labelText: label)),
       );
 }

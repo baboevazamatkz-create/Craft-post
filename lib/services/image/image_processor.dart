@@ -59,7 +59,9 @@ class ImageProcessor {
       ui.Paint()..filterQuality = ui.FilterQuality.high,
     );
     await overlay(canvas, size);
-    final out = await rec.endRecording().toImage(size.width.toInt(), size.height.toInt());
+    final out = await rec
+        .endRecording()
+        .toImage(size.width.toInt(), size.height.toInt());
     src.dispose();
     return out;
   }
@@ -68,7 +70,8 @@ class ImageProcessor {
     final bd = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
     final w = image.width, h = image.height;
     image.dispose();
-    return compute(_encodeJpg, _JpgJob(bd!.buffer.asUint8List(), w, h, quality));
+    return compute(
+        _encodeJpg, _JpgJob(bd!.buffer.asUint8List(), w, h, quality));
   }
 
   /// Главное фото с инфографикой.
@@ -83,19 +86,60 @@ class ImageProcessor {
   }
 
   /// Остальные фото с логотипом.
-  Future<Uint8List> renderOther(String path, {int? maxSide, int quality = 92}) async {
+  Future<Uint8List> renderOther(String path,
+      {int? maxSide, int quality = 92}) async {
     final logo = await _loadLogo();
-    final image = await _draw(path, maxSide, (c, s) async => _drawLogo(c, s, logo));
+    final image =
+        await _draw(path, maxSide, (c, s) async => _drawLogo(c, s, logo));
     return _toJpeg(image, quality);
   }
 
+  /// Логотип как в макете: непрозрачность 60% и тёмное размытое свечение вокруг
+  /// (под самим логотипом свечения нет). Параметры подобраны по замеру готового поста.
   void _drawLogo(ui.Canvas c, Size s, ui.Image logo) {
     final lw = logo.width.toDouble(), lh = logo.height.toDouble();
+    final src = ui.Rect.fromLTWH(0, 0, lw, lh);
+    final dst = logoPlacement.rect(s, Size(lw, lh));
+    final sigma = dst.width * 0.0356;
+    final bounds = dst.inflate(sigma * 4);
+    final hq = ui.Paint()..filterQuality = ui.FilterQuality.high;
+
+    // Тень: силуэт → размытие → усиление до 150% (чёрным) → вырез по логотипу.
+    c.saveLayer(bounds, ui.Paint());
+    c.saveLayer(
+      bounds,
+      ui.Paint()
+        ..colorFilter = const ui.ColorFilter.matrix(<double>[
+          0, 0, 0, 0, 0, //
+          0, 0, 0, 0, 0,
+          0, 0, 0, 0, 0,
+          0, 0, 0, 1.5, 0,
+        ]),
+    );
+    c.saveLayer(
+        bounds,
+        ui.Paint()
+          ..imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma));
+    c.drawImageRect(logo, src, dst, hq);
+    c.restore();
+    c.restore();
     c.drawImageRect(
       logo,
-      ui.Rect.fromLTWH(0, 0, lw, lh),
-      logoPlacement.rect(s, Size(lw, lh)),
-      ui.Paint()..filterQuality = ui.FilterQuality.high,
+      src,
+      dst,
+      ui.Paint()
+        ..filterQuality = ui.FilterQuality.high
+        ..blendMode = ui.BlendMode.dstOut,
+    );
+    c.restore();
+
+    c.drawImageRect(
+      logo,
+      src,
+      dst,
+      ui.Paint()
+        ..filterQuality = ui.FilterQuality.high
+        ..color = const ui.Color.fromRGBO(255, 255, 255, 0.6),
     );
   }
 

@@ -62,17 +62,15 @@ AiResult parseAiJson(String raw) {
     throw const FormatException('AI вернул ответ без JSON');
   }
   final m = jsonDecode(raw.substring(start, end + 1)) as Map<String, dynamic>;
-  final features = ((m['features'] as List?) ?? [])
-      .map((e) {
-        final text = '${e['text'] ?? ''}';
-        final icon = '${e['icon'] ?? ''}';
-        return Feature(
-          kIcons.any((i) => i.key == icon) ? icon : guessIcon(text),
-          text,
-          sanitizeSvgPaths(e['icon_paths']),
-        );
-      })
-      .toList();
+  final features = ((m['features'] as List?) ?? []).map((e) {
+    final text = '${e['text'] ?? ''}';
+    final icon = '${e['icon'] ?? ''}';
+    return Feature(
+      kIcons.any((i) => i.key == icon) ? icon : guessIcon(text),
+      text,
+      sanitizeSvgPaths(e['icon_paths']),
+    );
+  }).toList();
   return AiResult(
     '${m['caption'] ?? ''}',
     InfographicText(

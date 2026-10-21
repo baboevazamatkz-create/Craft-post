@@ -5,7 +5,8 @@ import 'app_state.dart';
 import 'screens/photo_select_screen.dart';
 
 void main() => runApp(
-      ChangeNotifierProvider(create: (_) => AppState(), child: const CraftApp()),
+      ChangeNotifierProvider(
+          create: (_) => AppState(), child: const CraftApp()),
     );
 
 class CraftApp extends StatelessWidget {
@@ -19,11 +20,13 @@ class CraftApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: accent, brightness: Brightness.dark),
+        colorScheme: ColorScheme.fromSeed(
+            seedColor: accent, brightness: Brightness.dark),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(60),
-            textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            textStyle:
+                const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
@@ -32,7 +35,8 @@ class CraftApp extends StatelessWidget {
             textStyle: const TextStyle(fontSize: 17),
           ),
         ),
-        inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
+        inputDecorationTheme:
+            const InputDecorationTheme(border: OutlineInputBorder()),
       ),
       home: const PhotoSelectScreen(),
     );

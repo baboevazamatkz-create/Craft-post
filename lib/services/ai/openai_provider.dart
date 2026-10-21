@@ -43,7 +43,8 @@ class OpenAiProvider implements AiProvider {
                   {
                     'type': 'image_url',
                     'image_url': {
-                      'url': 'data:image/jpeg;base64,${base64Encode(mainPhotoJpeg)}'
+                      'url':
+                          'data:image/jpeg;base64,${base64Encode(mainPhotoJpeg)}'
                     },
                   },
                   {'type': 'text', 'text': fieldsToText(fields, features)},
@@ -56,7 +57,8 @@ class OpenAiProvider implements AiProvider {
     if (resp.statusCode != 200) {
       throw Exception('AI: ошибка ${resp.statusCode}');
     }
-    final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    final body =
+        jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
     return parseAiJson(body['choices'][0]['message']['content'] as String);
   }
 }

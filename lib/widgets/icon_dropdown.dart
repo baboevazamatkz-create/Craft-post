@@ -7,7 +7,11 @@ class IconDropdown extends StatelessWidget {
   final String value;
   final bool hasAi;
   final ValueChanged<String> onChanged;
-  const IconDropdown({super.key, required this.value, required this.hasAi, required this.onChanged});
+  const IconDropdown(
+      {super.key,
+      required this.value,
+      required this.hasAi,
+      required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -16,8 +20,10 @@ class IconDropdown extends StatelessWidget {
       isExpanded: true,
       decoration: const InputDecoration(labelText: 'Значок'),
       items: [
-        if (hasAi) const DropdownMenuItem(value: 'ai', child: Text('Нарисован AI')),
-        for (final i in kIcons) DropdownMenuItem(value: i.key, child: Text(i.label)),
+        if (hasAi)
+          const DropdownMenuItem(value: 'ai', child: Text('Нарисован AI')),
+        for (final i in kIcons)
+          DropdownMenuItem(value: i.key, child: Text(i.label)),
       ],
       onChanged: (v) => onChanged(v ?? value),
     );

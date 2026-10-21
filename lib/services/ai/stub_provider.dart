@@ -19,11 +19,19 @@ class StubAiProvider implements AiProvider {
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 600));
     String f(String k) => (fields[k] ?? '').trim();
-    final done = f('done').split('\n').where((l) => l.trim().isNotEmpty).map((l) => ' ▪ ${l.trim()}');
+    final done = f('done')
+        .split('\n')
+        .where((l) => l.trim().isNotEmpty)
+        .map((l) => ' ▪ ${l.trim()}');
     final caption = [
-      '🔷 ${[f('object'), f('stat'), f('unit')].where((e) => e.isNotEmpty).join(' ')}',
+      '🔷 ${[
+        f('object'),
+        f('stat'),
+        f('unit')
+      ].where((e) => e.isNotEmpty).join(' ')}',
       if (f('task').isNotEmpty) '❗ Задача — ${f('task')}',
-      if (f('work').isNotEmpty && f('task').isEmpty) '❗ Задача — ${f('work').toLowerCase()}.',
+      if (f('work').isNotEmpty && f('task').isEmpty)
+        '❗ Задача — ${f('work').toLowerCase()}.',
       if (done.isNotEmpty) '✔️ Что было сделано:\n${done.join('\n')}',
     ].join('\n\n');
     return AiResult(
@@ -32,7 +40,9 @@ class StubAiProvider implements AiProvider {
         title: f('object'),
         subtitle: f('work'),
         location: f('location'),
-        features: [for (final x in features) Feature(guessIcon(x.text), x.text)],
+        features: [
+          for (final x in features) Feature(guessIcon(x.text), x.text)
+        ],
       ),
     );
   }

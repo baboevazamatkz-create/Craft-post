@@ -48,18 +48,22 @@ class _SaveScreenState extends State<SaveScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Фото к сохранению: ${1 + s.draft.otherPaths.length}\nАльбом в галерее: CRAFT SYSTEM',
+            Text(
+                'Фото к сохранению: ${1 + s.draft.otherPaths.length}\nАльбом в галерее: CRAFT SYSTEM',
                 style: const TextStyle(fontSize: 18)),
             const SizedBox(height: 16),
             if (_saving || _finished) ...[
-              LinearProgressIndicator(minHeight: 10, value: _total == 0 ? 0 : _done / _total),
+              LinearProgressIndicator(
+                  minHeight: 10, value: _total == 0 ? 0 : _done / _total),
               const SizedBox(height: 8),
               Text('$_done из $_total', style: const TextStyle(fontSize: 16)),
             ],
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
-                child: Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 16)),
+                child: Text(_error!,
+                    style:
+                        const TextStyle(color: Colors.redAccent, fontSize: 16)),
               ),
             if (_finished) ...[
               const SizedBox(height: 16),
@@ -67,7 +71,8 @@ class _SaveScreenState extends State<SaveScreen> {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
               OutlinedButton.icon(
-                onPressed: () => Clipboard.setData(ClipboardData(text: s.draft.caption)),
+                onPressed: () =>
+                    Clipboard.setData(ClipboardData(text: s.draft.caption)),
                 icon: const Icon(Icons.copy),
                 label: const Text('Скопировать подпись'),
               ),

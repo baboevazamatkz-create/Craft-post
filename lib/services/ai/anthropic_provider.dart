@@ -57,7 +57,8 @@ class AnthropicProvider implements AiProvider {
     if (resp.statusCode != 200) {
       throw Exception('AI: ошибка ${resp.statusCode}');
     }
-    final body = jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
+    final body =
+        jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
     final text = (body['content'] as List).map((c) => c['text'] ?? '').join();
     return parseAiJson(text);
   }
