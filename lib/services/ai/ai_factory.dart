@@ -9,7 +9,9 @@ const kProviderIds = {
   'openai': 'OpenAI (GPT)',
 };
 
+/// Без ключа работает заглушка, чтобы приложение можно было пробовать офлайн.
 AiProvider createAiProvider(String id, String apiKey) {
+  if (apiKey.trim().isEmpty) return StubAiProvider();
   switch (id) {
     case 'anthropic':
       return AnthropicProvider(apiKey);

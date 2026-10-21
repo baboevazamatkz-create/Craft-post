@@ -9,6 +9,6 @@ class SettingsService {
   Future<String> apiKey() async => await _storage.read(key: _kKey) ?? '';
   Future<void> setApiKey(String v) => _storage.write(key: _kKey, value: v.trim());
 
-  Future<String> provider() async => await _storage.read(key: _kProvider) ?? 'stub';
+  Future<String> provider() async => await _storage.read(key: _kProvider) ?? 'anthropic';
   Future<void> setProvider(String v) => _storage.write(key: _kProvider, value: v);
 }

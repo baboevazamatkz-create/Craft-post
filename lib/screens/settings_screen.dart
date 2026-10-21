@@ -13,7 +13,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final _key = TextEditingController();
-  String _provider = 'stub';
+  String _provider = 'anthropic';
   bool _loaded = false;
 
   @override
@@ -54,7 +54,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   for (final e in kProviderIds.entries)
                     DropdownMenuItem(value: e.key, child: Text(e.value)),
                 ],
-                onChanged: (v) => setState(() => _provider = v ?? 'stub'),
+                onChanged: (v) => setState(() => _provider = v ?? 'anthropic'),
               ),
               const SizedBox(height: 16),
               TextField(
