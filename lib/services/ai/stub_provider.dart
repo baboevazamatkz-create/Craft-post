@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:typed_data';
 
 import '../../models/post_draft.dart';
@@ -45,5 +46,29 @@ class StubAiProvider implements AiProvider {
         ],
       ),
     );
+  }
+
+  /// Без AI: для каждого преимущества три разных встроенных значка,
+  /// первый — подобранный по смыслу подписи.
+  @override
+  Future<IconIdeas> suggestIcons({
+    required Uint8List mainPreviewJpeg,
+    required InfographicText current,
+    required String instruction,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    final rnd = Random();
+    return IconIdeas([
+      for (final f in current.features)
+        FeatureIdeas(f.text, () {
+          final keys = <String>[guessIcon(f.text)];
+          final rest = [for (final i in kIcons) i.key]..shuffle(rnd);
+          for (final k in rest) {
+            if (keys.length >= kIconVariants) break;
+            if (!keys.contains(k) && k != f.icon) keys.add(k);
+          }
+          return [for (final k in keys) iconByKey(k).paths];
+        }()),
+    ]);
   }
 }

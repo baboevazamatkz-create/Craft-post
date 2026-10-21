@@ -8,6 +8,7 @@ import '../models/post_draft.dart';
 import '../widgets/busy.dart';
 import '../widgets/icon_dropdown.dart';
 import '../widgets/image_viewer.dart';
+import 'ai_icons_screen.dart';
 import 'review_screen.dart';
 
 class PreviewScreen extends StatefulWidget {
@@ -33,19 +34,38 @@ class _PreviewScreenState extends State<PreviewScreen> {
     super.initState();
     final d = context.read<AppState>().draft;
     _caption = TextEditingController(text: d.caption);
-    _title = TextEditingController(text: d.infographic.title);
-    _subtitle = TextEditingController(text: d.infographic.subtitle);
-    _location = TextEditingController(text: d.infographic.location);
-    _stat = TextEditingController(text: d.infographic.stat);
-    _unit = TextEditingController(text: d.infographic.unit);
-    _feat = [
-      for (final f in d.infographic.features)
-        TextEditingController(text: f.text)
-    ];
-    _icons = [
-      for (final f in d.infographic.features) f.svg.isNotEmpty ? 'ai' : f.icon
-    ];
-    _svgs = [for (final f in d.infographic.features) f.svg];
+    _title = TextEditingController();
+    _subtitle = TextEditingController();
+    _location = TextEditingController();
+    _stat = TextEditingController();
+    _unit = TextEditingController();
+    _feat = [for (final _ in d.infographic.features) TextEditingController()];
+    _icons = List.filled(_feat.length, 'bolt');
+    _svgs = List.filled(_feat.length, const <String>[]);
+    _loadInfographic();
+  }
+
+  /// Заполняет поля инфографики из черновика (в т.ч. после AI-редактора).
+  void _loadInfographic() {
+    final t = context.read<AppState>().draft.infographic;
+    _title.text = t.title;
+    _subtitle.text = t.subtitle;
+    _location.text = t.location;
+    _stat.text = t.stat;
+    _unit.text = t.unit;
+    for (var i = 0; i < _feat.length && i < t.features.length; i++) {
+      final f = t.features[i];
+      _feat[i].text = f.text;
+      _icons[i] = f.svg.isNotEmpty ? 'ai' : f.icon;
+      _svgs[i] = f.svg;
+    }
+  }
+
+  Future<void> _openAiEditor() async {
+    _apply();
+    final changed = await Navigator.push<bool>(
+        context, MaterialPageRoute(builder: (_) => const AiIconsScreen()));
+    if (changed == true && mounted) setState(_loadInfographic);
   }
 
   @override
@@ -127,6 +147,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
             child: Text('Нажмите на фото, чтобы открыть и увеличить',
                 style: TextStyle(fontSize: 13)),
           ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _openAiEditor,
+            icon: const Icon(Icons.auto_awesome),
+            label: const Text('Улучшить значки через AI'),
+          ),
           const SizedBox(height: 16),
           const Text('Инфографика',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
@@ -144,6 +170,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: IconDropdown(
+                  key: ValueKey(
+                      'icon_${i}_${_icons[i]}_${identityHashCode(_svgs[i])}'),
                   value: _icons[i],
                   hasAi: _svgs[i].isNotEmpty,
                   onChanged: (v) => _icons[i] = v),

@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'models/post_draft.dart';
 import 'services/ai/ai_factory.dart';
+import 'services/ai/ai_provider.dart';
 import 'services/gallery_saver.dart';
 import 'services/image/image_processor.dart';
 import 'services/post_store.dart';
@@ -71,6 +72,18 @@ class AppState extends ChangeNotifier {
     draft.saved = List.filled(draft.imageCount, false);
     saveStates = List.filled(draft.imageCount, SaveState.none);
     await refreshPreviews();
+  }
+
+  /// AI-редактор главного фото: варианты значков по текущему превью.
+  /// В AI уходит только главное фото (превью с инфографикой) и тексты.
+  Future<IconIdeas> suggestIcons(String instruction) async {
+    final ai =
+        createAiProvider(await settings.provider(), await settings.apiKey());
+    final jpeg = draft.mainPreview ?? await processor.aiPhoto(draft.mainPath!);
+    return ai.suggestIcons(
+        mainPreviewJpeg: jpeg,
+        current: draft.infographic,
+        instruction: instruction);
   }
 
   /// Перерисовывает превью и обновляет пост в истории. Главное фото после

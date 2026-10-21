@@ -2,7 +2,10 @@ import 'dart:typed_data';
 
 import 'package:craft_post/app_state.dart';
 import 'package:craft_post/models/post_draft.dart';
+import 'package:craft_post/screens/ai_icons_screen.dart';
 import 'package:craft_post/screens/preview_screen.dart';
+import 'package:craft_post/services/ai/ai_provider.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:craft_post/screens/review_screen.dart';
 import 'package:craft_post/theme.dart';
 import 'package:flutter/material.dart';
@@ -103,5 +106,42 @@ void main() {
     await settle(t);
     expect(find.text('2 / 3'), findsOneWidget);
     expect(find.byType(InteractiveViewer), findsWidgets);
+  });
+
+  test('parseIconJson: варианты значков, мусор отбрасывается', () {
+    final cur = InfographicText(features: [
+      Feature('bolt', 'Свет'),
+      Feature('bolt', 'Щит'),
+    ]);
+    final r = parseIconJson(
+        '```json\n{"title":"","features":[{"text":"Свет","variants":'
+        '[["M2 2L22 22","M4 4h16"],["<script>"],["M12 3a9 9 0 1 0 0.01 0"]]},'
+        '{"text":"Электрощит","variants":[["M4 3h16v18H4z"]]}]}\n```',
+        cur);
+    expect(r.features[0].variants.length, 2); // «<script>» отброшен
+    expect(r.features[1].text, 'Электрощит');
+    expect(r.title, isNull);
+  });
+
+  testWidgets('AI-редактор: без ключа предлагает варианты встроенных значков',
+      (t) async {
+    FlutterSecureStorage.setMockInitialValues({});
+    t.view.physicalSize = const Size(1080, 2340);
+    t.view.devicePixelRatio = 2.75;
+    addTearDown(t.view.reset);
+    final s = stateWith3Photos();
+    s.draft.infographic = InfographicText(features: [
+      Feature('bolt', 'Автоматика день-ночь'),
+      Feature('bolt', 'Дистанционная настройка'),
+      Feature('bolt', 'Работа на высоте'),
+    ]);
+    await t.pumpWidget(app(s, const AiIconsScreen()));
+    await t.tap(find.text('Предложить варианты'));
+    await t.runAsync(() => Future<void>.delayed(const Duration(seconds: 1)));
+    await settle(t);
+    expect(find.text('Вариант 3'), findsWidgets);
+    await t.scrollUntilVisible(find.text('Применить и обновить превью'), 300,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.text('Применить и обновить превью'), findsOneWidget);
   });
 }

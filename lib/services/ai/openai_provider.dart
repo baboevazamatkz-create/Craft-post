@@ -3,11 +3,10 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
-import '../../models/post_draft.dart';
 import 'ai_provider.dart';
 
 /// Подходит и для OpenAI-совместимых API (поменять [baseUrl] и [model]).
-class OpenAiProvider implements AiProvider {
+class OpenAiProvider extends ChatAiProvider {
   final String apiKey;
   final String model;
   final String baseUrl;
@@ -20,10 +19,11 @@ class OpenAiProvider implements AiProvider {
   String get title => 'OpenAI (GPT)';
 
   @override
-  Future<AiResult> generate({
-    required Uint8List mainPhotoJpeg,
-    required Map<String, String> fields,
-    required List<Feature> features,
+  Future<String> ask({
+    required String system,
+    required String text,
+    required Uint8List jpeg,
+    String effort = 'medium',
   }) async {
     if (apiKey.isEmpty) throw Exception('Не задан API-ключ (Настройки)');
     final resp = await http
@@ -36,29 +36,28 @@ class OpenAiProvider implements AiProvider {
           body: jsonEncode({
             'model': model,
             'messages': [
-              {'role': 'system', 'content': kSystemPrompt},
+              {'role': 'system', 'content': system},
               {
                 'role': 'user',
                 'content': [
                   {
                     'type': 'image_url',
                     'image_url': {
-                      'url':
-                          'data:image/jpeg;base64,${base64Encode(mainPhotoJpeg)}'
+                      'url': 'data:image/jpeg;base64,${base64Encode(jpeg)}'
                     },
                   },
-                  {'type': 'text', 'text': fieldsToText(fields, features)},
+                  {'type': 'text', 'text': text},
                 ],
               }
             ],
           }),
         )
-        .timeout(const Duration(seconds: 60));
+        .timeout(const Duration(seconds: 180));
     if (resp.statusCode != 200) {
       throw Exception('AI: ошибка ${resp.statusCode}');
     }
     final body =
         jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
-    return parseAiJson(body['choices'][0]['message']['content'] as String);
+    return body['choices'][0]['message']['content'] as String;
   }
 }

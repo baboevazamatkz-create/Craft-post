@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:path_drawing/path_drawing.dart';
 import 'package:flutter/painting.dart';
 
 import '../../models/icon_library.dart';
+import '../../models/line_icon.dart';
 import '../../models/post_draft.dart';
 
 /// Шаблон инфографики по макету «АЗС Magnum» (фото 3:4).
@@ -75,26 +75,8 @@ class InfographicTemplate {
 
   /// Тонкий линейный значок: пути в сетке 24×24 масштабируются до [size].
   void _icon(ui.Canvas canvas, List<String> paths, Offset at, double size,
-      double stroke) {
-    final k = size / 24;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..color = _white
-      ..strokeWidth = stroke / k
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    canvas.save();
-    canvas.translate(at.dx, at.dy);
-    canvas.scale(k);
-    for (final d in paths) {
-      try {
-        canvas.drawPath(parseSvgPathData(d), paint);
-      } catch (_) {
-        // Некорректный путь от AI пропускаем.
-      }
-    }
-    canvas.restore();
-  }
+          double stroke) =>
+      paintLineIcon(canvas, paths, at & Size(size, size), stroke, _white);
 
   TextPainter _text(String s, double size, int weight, double maxW,
       {TextAlign align = TextAlign.left, int maxLines = 2}) {

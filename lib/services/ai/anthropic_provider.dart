@@ -3,10 +3,9 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
-import '../../models/post_draft.dart';
 import 'ai_provider.dart';
 
-class AnthropicProvider implements AiProvider {
+class AnthropicProvider extends ChatAiProvider {
   final String apiKey;
   final String model;
   AnthropicProvider(this.apiKey, {this.model = 'claude-opus-5-5'});
@@ -17,12 +16,32 @@ class AnthropicProvider implements AiProvider {
   String get title => 'Claude (Anthropic)';
 
   @override
-  Future<AiResult> generate({
-    required Uint8List mainPhotoJpeg,
-    required Map<String, String> fields,
-    required List<Feature> features,
+  Future<String> ask({
+    required String system,
+    required String text,
+    required Uint8List jpeg,
+    String effort = 'medium',
   }) async {
     if (apiKey.isEmpty) throw Exception('Не задан API-ключ (Настройки)');
+    var body = await _post(system, text, jpeg, effort);
+    // Если рассуждения не уместились в лимит — повторяем с меньшим усилием.
+    if (body['stop_reason'] == 'max_tokens' && effort != 'low') {
+      body = await _post(system, text, jpeg, 'low');
+    }
+    if (body['stop_reason'] == 'refusal') {
+      throw Exception('AI отказался обработать это фото. Попробуйте другое.');
+    }
+    if (body['stop_reason'] == 'max_tokens') {
+      throw Exception('AI не уложился в ответ. Попробуйте ещё раз.');
+    }
+    return (body['content'] as List)
+        .where((c) => c['type'] == 'text')
+        .map((c) => c['text'] as String)
+        .join();
+  }
+
+  Future<Map<String, dynamic>> _post(
+      String system, String text, Uint8List jpeg, String effort) async {
     final resp = await http
         .post(
           Uri.parse('https://api.anthropic.com/v1/messages'),
@@ -37,9 +56,9 @@ class AnthropicProvider implements AiProvider {
           body: jsonEncode({
             'model': model,
             'max_tokens': 16000,
-            'output_config': {'effort': 'medium'},
+            'output_config': {'effort': effort},
             'fallbacks': 'default',
-            'system': kSystemPrompt,
+            'system': system,
             'messages': [
               {
                 'role': 'user',
@@ -49,29 +68,22 @@ class AnthropicProvider implements AiProvider {
                     'source': {
                       'type': 'base64',
                       'media_type': 'image/jpeg',
-                      'data': base64Encode(mainPhotoJpeg),
+                      'data': base64Encode(jpeg),
                     },
                   },
-                  {'type': 'text', 'text': fieldsToText(fields, features)},
+                  {'type': 'text', 'text': text},
                 ],
               }
             ],
           }),
         )
-        .timeout(const Duration(seconds: 120));
+        .timeout(const Duration(seconds: 180));
     final body =
         jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
     if (resp.statusCode != 200) {
       throw Exception(_errorText(resp.statusCode, body));
     }
-    if (body['stop_reason'] == 'refusal') {
-      throw Exception('AI отказался обработать это фото. Попробуйте другое.');
-    }
-    final text = (body['content'] as List)
-        .where((c) => c['type'] == 'text')
-        .map((c) => c['text'] as String)
-        .join();
-    return parseAiJson(text);
+    return body;
   }
 
   static String _errorText(int status, Map<String, dynamic> body) {
