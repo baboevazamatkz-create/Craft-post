@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/post_draft.dart';
 import '../widgets/busy.dart';
+import '../widgets/icon_dropdown.dart';
 import 'save_screen.dart';
 
 class PreviewScreen extends StatefulWidget {
@@ -14,8 +15,9 @@ class PreviewScreen extends StatefulWidget {
 }
 
 class _PreviewScreenState extends State<PreviewScreen> {
-  late final TextEditingController _caption, _title, _subtitle;
-  late final List<TextEditingController> _labels, _values;
+  late final TextEditingController _caption, _title, _subtitle, _location;
+  late final List<TextEditingController> _feat;
+  late final List<String> _icons;
 
   @override
   void initState() {
@@ -24,13 +26,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
     _caption = TextEditingController(text: d.caption);
     _title = TextEditingController(text: d.infographic.title);
     _subtitle = TextEditingController(text: d.infographic.subtitle);
-    _labels = [for (final i in d.infographic.items) TextEditingController(text: i.label)];
-    _values = [for (final i in d.infographic.items) TextEditingController(text: i.value)];
+    _location = TextEditingController(text: d.infographic.location);
+    _feat = [for (final f in d.infographic.features) TextEditingController(text: f.text)];
+    _icons = [for (final f in d.infographic.features) f.icon];
   }
 
   @override
   void dispose() {
-    for (final c in [_caption, _title, _subtitle, ..._labels, ..._values]) {
+    for (final c in [_caption, _title, _subtitle, _location, ..._feat]) {
       c.dispose();
     }
     super.dispose();
@@ -43,8 +46,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
     d.infographic
       ..title = _title.text
       ..subtitle = _subtitle.text
-      ..items = [
-        for (var i = 0; i < _labels.length; i++) InfoItem(_labels[i].text, _values[i].text),
+      ..location = _location.text
+      ..features = [
+        for (var i = 0; i < _feat.length; i++) Feature(_icons[i], _feat[i].text),
       ];
   }
 
@@ -84,12 +88,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
           const SizedBox(height: 8),
           _field(_title, 'Заголовок'),
           _field(_subtitle, 'Подзаголовок'),
-          for (var i = 0; i < _labels.length; i++)
-            Row(children: [
-              Expanded(child: _field(_labels[i], 'Подпись ${i + 1}')),
-              const SizedBox(width: 8),
-              Expanded(child: _field(_values[i], 'Значение ${i + 1}')),
-            ]),
+          _field(_location, 'Локация'),
+          for (var i = 0; i < _feat.length; i++) ...[
+            _field(_feat[i], 'Преимущество ${i + 1}'),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: IconDropdown(value: _icons[i], onChanged: (v) => _icons[i] = v),
+            ),
+          ],
           OutlinedButton.icon(
             onPressed: _refresh,
             icon: const Icon(Icons.refresh),

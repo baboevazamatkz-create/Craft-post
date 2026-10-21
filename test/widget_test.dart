@@ -4,9 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('parseAiJson разбирает ответ в обёртке ```json', () {
     final r = parseAiJson('```json\n{"caption":"c","title":"t","subtitle":"s",'
-        '"items":[{"label":"Площадь","value":"120 м²"}]}\n```');
+        '"location":"Черкесск","features":[{"icon":"remote","text":"Настройка"}]}\n```');
     expect(r.caption, 'c');
-    expect(r.infographic.items.single.value, '120 м²');
+    expect(r.infographic.location, 'Черкесск');
+    expect(r.infographic.features.single.icon, 'remote');
   });
 
   test('parseAiJson падает без JSON', () {

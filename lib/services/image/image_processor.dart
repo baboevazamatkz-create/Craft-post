@@ -74,23 +74,29 @@ class ImageProcessor {
   /// Главное фото с инфографикой.
   Future<Uint8List> renderMain(String path, InfographicText t,
       {int? maxSide, int quality = 92}) async {
-    final image = await _draw(path, maxSide, (c, s) async => template.paint(c, s, t));
+    final logo = await _loadLogo();
+    final image = await _draw(path, maxSide, (c, s) async {
+      template.paint(c, s, t);
+      _drawLogo(c, s, logo);
+    });
     return _toJpeg(image, quality);
   }
 
   /// Остальные фото с логотипом.
   Future<Uint8List> renderOther(String path, {int? maxSide, int quality = 92}) async {
     final logo = await _loadLogo();
-    final image = await _draw(path, maxSide, (c, s) async {
-      final dst = logoPlacement.rect(s, Size(logo.width.toDouble(), logo.height.toDouble()));
-      c.drawImageRect(
-        logo,
-        ui.Rect.fromLTWH(0, 0, logo.width.toDouble(), logo.height.toDouble()),
-        dst,
-        ui.Paint()..filterQuality = ui.FilterQuality.high,
-      );
-    });
+    final image = await _draw(path, maxSide, (c, s) async => _drawLogo(c, s, logo));
     return _toJpeg(image, quality);
+  }
+
+  void _drawLogo(ui.Canvas c, Size s, ui.Image logo) {
+    final lw = logo.width.toDouble(), lh = logo.height.toDouble();
+    c.drawImageRect(
+      logo,
+      ui.Rect.fromLTWH(0, 0, lw, lh),
+      logoPlacement.rect(s, Size(lw, lh)),
+      ui.Paint()..filterQuality = ui.FilterQuality.high,
+    );
   }
 
   /// Маленький JPEG без наложений — для отправки в AI.

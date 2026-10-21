@@ -14,20 +14,25 @@ class StubAiProvider implements AiProvider {
   Future<AiResult> generate({
     required Uint8List mainPhotoJpeg,
     required Map<String, String> fields,
+    required List<Feature> features,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 600));
     String f(String k) => (fields[k] ?? '').trim();
-    final items = <InfoItem>[
-      if (f('area').isNotEmpty) InfoItem('Площадь', '${f('area')} м²'),
-      if (f('power').isNotEmpty) InfoItem('Мощность', '${f('power')} кВт'),
-      if (f('days').isNotEmpty) InfoItem('Срок', '${f('days')} дн.'),
-    ];
-    final city = f('city').isEmpty ? 'Черкесск' : f('city');
+    final done = f('done').split('\n').where((l) => l.trim().isNotEmpty).map((l) => ' ▪ ${l.trim()}');
+    final caption = [
+      '🔷 ${f('object')}',
+      if (f('task').isNotEmpty) '❗ Задача — ${f('task')}',
+      if (f('work').isNotEmpty && f('task').isEmpty) '❗ Задача — ${f('work').toLowerCase()}.',
+      if (done.isNotEmpty) '✔️ Что было сделано:\n${done.join('\n')}',
+    ].join('\n\n');
     return AiResult(
-      '⚡ ${f('object')}\n${f('work')}.\n\n'
-      'CRAFT SYSTEM — электромонтаж для бизнеса. $city.\n\n'
-      '#электромонтаж #craftsystem #черкесск',
-      InfographicText(title: f('object'), subtitle: f('work'), items: items),
+      caption,
+      InfographicText(
+        title: f('object'),
+        subtitle: f('work'),
+        location: f('location'),
+        features: [for (final x in features) Feature(x.icon, x.text)],
+      ),
     );
   }
 }

@@ -5,33 +5,40 @@ class FieldSpec {
   final String key;
   final String label;
   final String hint;
-  final bool numeric;
-  const FieldSpec(this.key, this.label, {this.hint = '', this.numeric = false});
+  final bool multiline;
+  const FieldSpec(this.key, this.label, {this.hint = '', this.multiline = false});
 }
 
-/// Заглушка: набор полей будет уточнён по примерам пользователя.
+/// Текстовые поля формы (значки преимуществ — отдельно, см. [kFeatureCount]).
 const kInfographicFields = <FieldSpec>[
-  FieldSpec('object', 'Название объекта', hint: 'Например: Магазин «Продукты»'),
-  FieldSpec('work', 'Тип работ', hint: 'Электромонтаж, щиты, освещение'),
-  FieldSpec('area', 'Площадь, м²', numeric: true),
-  FieldSpec('power', 'Мощность, кВт', numeric: true),
-  FieldSpec('days', 'Срок, дней', numeric: true),
-  FieldSpec('city', 'Город', hint: 'Черкесск'),
+  FieldSpec('object', 'Название объекта', hint: 'АЗС Magnum'),
+  FieldSpec('work', 'Тип работ', hint: 'Подключение стелы'),
+  FieldSpec('location', 'Локация', hint: 'Новая Джегута | КЧР'),
+  FieldSpec('task', 'Задача (необязательно)', multiline: true),
+  FieldSpec('done', 'Что сделано (по строке, необязательно)', multiline: true),
 ];
 
-class InfoItem {
-  String label;
-  String value;
-  InfoItem(this.label, this.value);
+/// Сколько преимуществ (значок + подпись) в нижней части инфографики.
+const kFeatureCount = 3;
+
+class Feature {
+  String icon; // ключ из kIcons
+  String text;
+  Feature(this.icon, this.text);
 }
 
 /// Текст, который рисуется на главном фото. Редактируется на экране превью.
 class InfographicText {
   String title;
   String subtitle;
-  List<InfoItem> items;
-  InfographicText({this.title = '', this.subtitle = '', List<InfoItem>? items})
-      : items = items ?? [];
+  String location;
+  List<Feature> features;
+  InfographicText({
+    this.title = '',
+    this.subtitle = '',
+    this.location = '',
+    List<Feature>? features,
+  }) : features = features ?? [];
 }
 
 class AiResult {
@@ -44,6 +51,9 @@ class PostDraft {
   String? mainPath;
   List<String> otherPaths = [];
   final Map<String, String> fields = {};
+  final List<Feature> features = [
+    for (var i = 0; i < kFeatureCount; i++) Feature('bolt', ''),
+  ];
 
   String caption = '';
   InfographicText infographic = InfographicText();
@@ -51,6 +61,4 @@ class PostDraft {
   // Превью в пониженном разрешении (JPEG-байты).
   Uint8List? mainPreview;
   List<Uint8List> otherPreviews = [];
-
-  bool get hasPhotos => mainPath != null;
 }

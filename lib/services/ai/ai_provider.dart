@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import '../../models/icon_library.dart';
 import '../../models/post_draft.dart';
 
 /// Общий интерфейс. Чтобы добавить провайдера: реализовать класс
@@ -13,24 +14,40 @@ abstract class AiProvider {
   Future<AiResult> generate({
     required Uint8List mainPhotoJpeg,
     required Map<String, String> fields,
+    required List<Feature> features,
   });
 }
 
-const kSystemPrompt =
+final kSystemPrompt =
     'Ты SMM-помощник компании CRAFT SYSTEM (электромонтажные работы для '
     'бизнеса, г. Черкесск). По фото и данным объекта составь подпись к '
-    'Instagram-посту (деловой тон, 3–6 строк, эмодзи умеренно, хэштеги в конце) '
-    'и короткий текст для инфографики. Не выдумывай цифры, используй только '
-    'данные из полей. Ответ строго JSON без пояснений: '
-    '{"caption": "...", "title": "...", "subtitle": "...", '
-    '"items": [{"label": "...", "value": "..."}]}';
+    'Instagram-посту строго в таком формате:\n'
+    '🔷 <Тип объекта> «<НАЗВАНИЕ>»\n\n'
+    '❗ Задача — <одно предложение>.\n\n'
+    '✔️ Что было сделано:\n ▪ <пункт>\n ▪ <пункт> (3–5 пунктов)\n\n'
+    '⚡ Профессиональные детали:\n ▪ <пункт> (3 пункта)\n'
+    'Деловой тон, без хэштегов. Не выдумывай факты и цифры: опирайся на '
+    'поля формы и фото. '
+    'Для инфографики верни title (название объекта), subtitle (тип работ), '
+    'location, features — ровно $kFeatureCount преимущества: короткая подпись '
+    '(1–3 слова) и значок icon из списка: ${kIcons.map((i) => i.key).join(", ")}. '
+    'Если преимущества заданы в форме, оставь их текст. '
+    'Ответ строго JSON без пояснений: {"caption": "...", "title": "...", '
+    '"subtitle": "...", "location": "...", '
+    '"features": [{"icon": "...", "text": "..."}]}';
 
-String fieldsToText(Map<String, String> fields) {
+String fieldsToText(Map<String, String> fields, List<Feature> features) {
   final labels = {for (final f in kInfographicFields) f.key: f.label};
-  return fields.entries
+  final lines = fields.entries
       .where((e) => e.value.trim().isNotEmpty)
       .map((e) => '${labels[e.key] ?? e.key}: ${e.value}')
-      .join('\n');
+      .toList();
+  for (var i = 0; i < features.length; i++) {
+    if (features[i].text.trim().isNotEmpty) {
+      lines.add('Преимущество ${i + 1}: ${features[i].text} (значок ${features[i].icon})');
+    }
+  }
+  return lines.join('\n');
 }
 
 /// Разбирает JSON из ответа модели (допускает обёртку ```json).
@@ -41,15 +58,16 @@ AiResult parseAiJson(String raw) {
     throw const FormatException('AI вернул ответ без JSON');
   }
   final m = jsonDecode(raw.substring(start, end + 1)) as Map<String, dynamic>;
-  final items = ((m['items'] as List?) ?? [])
-      .map((e) => InfoItem('${e['label'] ?? ''}', '${e['value'] ?? ''}'))
+  final features = ((m['features'] as List?) ?? [])
+      .map((e) => Feature('${e['icon'] ?? 'bolt'}', '${e['text'] ?? ''}'))
       .toList();
   return AiResult(
     '${m['caption'] ?? ''}',
     InfographicText(
       title: '${m['title'] ?? ''}',
       subtitle: '${m['subtitle'] ?? ''}',
-      items: items,
+      location: '${m['location'] ?? ''}',
+      features: features,
     ),
   );
 }

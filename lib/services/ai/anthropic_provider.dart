@@ -20,6 +20,7 @@ class AnthropicProvider implements AiProvider {
   Future<AiResult> generate({
     required Uint8List mainPhotoJpeg,
     required Map<String, String> fields,
+    required List<Feature> features,
   }) async {
     if (apiKey.isEmpty) throw Exception('Не задан API-ключ (Настройки)');
     final resp = await http
@@ -46,7 +47,7 @@ class AnthropicProvider implements AiProvider {
                       'data': base64Encode(mainPhotoJpeg),
                     },
                   },
-                  {'type': 'text', 'text': fieldsToText(fields)},
+                  {'type': 'text', 'text': fieldsToText(fields, features)},
                 ],
               }
             ],

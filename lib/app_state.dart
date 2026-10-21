@@ -48,7 +48,8 @@ class AppState extends ChangeNotifier {
     final providerId = await settings.provider();
     final ai = createAiProvider(providerId, await settings.apiKey());
     final photo = await processor.aiPhoto(draft.mainPath!);
-    final result = await ai.generate(mainPhotoJpeg: photo, fields: draft.fields);
+    final result = await ai.generate(
+        mainPhotoJpeg: photo, fields: draft.fields, features: draft.features);
     draft.caption = result.caption;
     draft.infographic = result.infographic;
     await refreshPreviews();

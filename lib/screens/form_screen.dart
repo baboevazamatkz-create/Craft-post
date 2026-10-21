@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/post_draft.dart';
 import '../widgets/busy.dart';
+import '../widgets/icon_dropdown.dart';
 import 'preview_screen.dart';
 
 class FormScreen extends StatefulWidget {
@@ -15,11 +16,14 @@ class FormScreen extends StatefulWidget {
 
 class _FormScreenState extends State<FormScreen> {
   late final Map<String, TextEditingController> _c;
+  late final List<TextEditingController> _feat;
 
   @override
   void initState() {
     super.initState();
-    final saved = context.read<AppState>().draft.fields;
+    final draft = context.read<AppState>().draft;
+    final saved = draft.fields;
+    _feat = [for (final f in draft.features) TextEditingController(text: f.text)];
     _c = {
       for (final f in kInfographicFields) f.key: TextEditingController(text: saved[f.key] ?? ''),
     };
@@ -27,7 +31,7 @@ class _FormScreenState extends State<FormScreen> {
 
   @override
   void dispose() {
-    for (final c in _c.values) {
+    for (final c in [..._c.values, ..._feat]) {
       c.dispose();
     }
     super.dispose();
@@ -38,6 +42,9 @@ class _FormScreenState extends State<FormScreen> {
     s.draft.fields
       ..clear()
       ..addAll({for (final e in _c.entries) e.key: e.value.text.trim()});
+    for (var i = 0; i < _feat.length; i++) {
+      s.draft.features[i].text = _feat[i].text.trim();
+    }
     final ok = await runBusy(context, 'Готовлю пост…', s.generate);
     if (ok && mounted) {
       Navigator.push(context, MaterialPageRoute(builder: (_) => const PreviewScreen()));
@@ -54,12 +61,29 @@ class _FormScreenState extends State<FormScreen> {
           for (final f in kInfographicFields) ...[
             TextField(
               controller: _c[f.key],
-              keyboardType: f.numeric ? TextInputType.number : TextInputType.text,
+              minLines: f.multiline ? 2 : 1,
+              maxLines: f.multiline ? 6 : 1,
               textCapitalization: TextCapitalization.sentences,
               style: const TextStyle(fontSize: 18),
               decoration: InputDecoration(labelText: f.label, hintText: f.hint),
             ),
             const SizedBox(height: 14),
+          ],
+          const Text('Преимущества на инфографике',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 10),
+          for (var i = 0; i < _feat.length; i++) ...[
+            TextField(
+              controller: _feat[i],
+              style: const TextStyle(fontSize: 18),
+              decoration: InputDecoration(labelText: 'Преимущество ${i + 1}', hintText: 'Автоматика день-ночь'),
+            ),
+            const SizedBox(height: 8),
+            IconDropdown(
+              value: context.read<AppState>().draft.features[i].icon,
+              onChanged: (v) => context.read<AppState>().draft.features[i].icon = v,
+            ),
+            const SizedBox(height: 16),
           ],
           const SizedBox(height: 8),
           FilledButton(onPressed: _create, child: const Text('Создать пост')),
