@@ -90,9 +90,9 @@ class StubAiProvider implements AiProvider {
         .toList();
     final phrases = (done == null || done.isEmpty)
         ? const [
-            'Аккуратный монтаж',
-            'Ровная укладка кабеля',
-            'Надёжное крепление'
+            'Кабель в одну линию по лазеру',
+            'Ни одного провода на виду',
+            'Запас под обслуживание'
           ]
         : done;
     return [

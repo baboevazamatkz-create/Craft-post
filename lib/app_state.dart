@@ -113,7 +113,7 @@ class AppState extends ChangeNotifier {
         createAiProvider(await settings.provider(), await settings.apiKey());
     final main = await processor.aiPhoto(draft.mainPath!, maxSide: 768);
     final others = [
-      for (final p in draft.otherPaths) await processor.aiPhoto(p, maxSide: 768)
+      for (final p in draft.otherPaths) await processor.aiPhoto(p)
     ];
     final result = await ai.suggestBadges(
         mainJpeg: main,

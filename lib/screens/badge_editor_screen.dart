@@ -67,7 +67,8 @@ class _BadgeEditorScreenState extends State<BadgeEditorScreen> {
           autofocus: true,
           maxLength: 40,
           textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(hintText: 'Ровная укладка кабеля'),
+          decoration:
+              const InputDecoration(hintText: 'Кабель в одну линию по лазеру'),
         ),
         actions: [
           if (i != null)
