@@ -6,6 +6,7 @@ import 'package:flutter/painting.dart';
 import '../../models/icon_library.dart';
 import '../../models/line_icon.dart';
 import '../../models/post_draft.dart';
+import 'fit_text.dart';
 
 /// Шаблон инфографики по макету «АЗС Magnum» (фото 3:4).
 /// Горизонтали заданы долями ширины, вертикали — долями высоты,
@@ -78,27 +79,32 @@ class InfographicTemplate {
           double stroke) =>
       paintLineIcon(canvas, paths, at & Size(size, size), stroke, _white);
 
+  /// Текст в капсе; длинный — мельче, но целиком (без многоточий).
   TextPainter _text(String s, double size, int weight, double maxW,
       {TextAlign align = TextAlign.left, int maxLines = 2}) {
-    return TextPainter(
-      text: TextSpan(
-        text: s.toUpperCase(),
-        style: TextStyle(
-          fontFamily: _font,
-          fontSize: size,
-          color: _white,
-          fontWeight: weight < 400 ? FontWeight.w300 : FontWeight.w400,
-          height: 1.15,
-          letterSpacing: size * 0.02,
+    return fitText(
+      s.toUpperCase(),
+      size,
+      math.max(1, maxW),
+      maxLines,
+      (text, size, lines) => TextPainter(
+        text: TextSpan(
+          text: text,
+          style: TextStyle(
+            fontFamily: _font,
+            fontSize: size,
+            color: _white,
+            fontWeight: weight < 400 ? FontWeight.w300 : FontWeight.w400,
+            height: 1.15,
+            letterSpacing: size * 0.02,
+          ),
         ),
+        textAlign: align,
+        textDirection: TextDirection.ltr,
+        maxLines: lines,
       ),
-      textAlign: align,
-      textDirection: TextDirection.ltr,
-      maxLines: maxLines,
-      ellipsis: '…',
-    )..layout(
-        minWidth: align == TextAlign.center ? maxW : 0,
-        maxWidth: math.max(1, maxW));
+      minWidth: align == TextAlign.center ? maxW : 0,
+    );
   }
 }
 

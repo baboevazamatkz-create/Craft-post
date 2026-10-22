@@ -6,6 +6,7 @@ import 'package:craft_post/screens/features_screen.dart';
 import 'package:craft_post/screens/preview_screen.dart';
 import 'package:craft_post/services/ai/ai_provider.dart';
 import 'package:craft_post/services/image/badges.dart';
+import 'package:craft_post/services/image/fit_text.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:craft_post/screens/review_screen.dart';
 import 'package:craft_post/theme.dart';
@@ -290,5 +291,21 @@ void main() {
     await t.scrollUntilVisible(find.text('Другие преимущества и значки'), 300,
         scrollable: find.byType(Scrollable).first);
     expect(find.text('Скрытая проводка'), findsOneWidget);
+  });
+
+  test('fitText: длинный текст мельче, но целиком и без многоточий', () {
+    TextPainter build(String t, double size, int? lines) => TextPainter(
+        text: TextSpan(text: t, style: TextStyle(fontSize: size)),
+        textDirection: TextDirection.ltr,
+        maxLines: lines);
+    double sizeOf(TextPainter p) => (p.text as TextSpan).style!.fontSize!;
+
+    expect(sizeOf(fitText('ЩИТ', 20, 200, 2, build)), 20);
+    final long = fitText('ДЛИННАЯ ПОДПИСЬ ПРЕИМУЩЕСТВА', 20, 200, 2, build);
+    expect(sizeOf(long), lessThan(20));
+    expect(sizeOf(long), greaterThanOrEqualTo(11));
+    expect(long.didExceedMaxLines, isFalse);
+    expect(long.computeLineMetrics().length, lessThanOrEqualTo(2));
+    expect(long.width, lessThanOrEqualTo(200.5)); // слово не режется
   });
 }

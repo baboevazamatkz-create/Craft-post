@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/painting.dart';
 
 import '../../models/post_draft.dart';
+import 'fit_text.dart';
 
 /// Где оказалась подпись после раскладки (для отрисовки и для перетаскивания).
 class BadgeBox {
@@ -93,49 +94,68 @@ class BadgePainter {
     ];
   }
 
-  TextPainter _text(double w, String text, TextAlign align, double maxWidth) {
-    final fs = w * 0.032;
-    return TextPainter(
-      text: TextSpan(
-        text: text.toUpperCase(),
-        style: TextStyle(
-          fontFamily: 'Cormorant',
-          fontSize: fs,
-          fontWeight: FontWeight.w400,
-          color: _white,
-          height: 1.2,
-          letterSpacing: fs * 0.07,
-          shadows: [
-            Shadow(color: const Color(0xCC000000), blurRadius: w * 0.008)
-          ],
-        ),
-      ),
-      textAlign: align,
-      textDirection: TextDirection.ltr,
-      textWidthBasis: TextWidthBasis.longestLine,
-      maxLines: 2,
-      ellipsis: '…',
-    )..layout(maxWidth: maxWidth);
+  static const _font = 0.028; // размер шрифта подписи, доля ширины кадра
+  static const _padH = 0.011, _padV = 0.0055;
+
+  /// Подписи, уже подогнанные под ширину: (по левому краю, по правому).
+  /// Раскладка вызывается на каждом кадре редактора — без кэша дорого.
+  final _texts = <String, (TextPainter, TextPainter)>{};
+
+  /// Подпись целиком в 2 строки шириной [maxWidth]: длинная — мельче,
+  /// без многоточий и переносов по буквам.
+  (TextPainter, TextPainter) _text(double w, String text, double maxWidth) {
+    final key = '$w|$maxWidth|$text';
+    final hit = _texts[key];
+    if (hit != null) return hit;
+    TextPainter build(String t, double fs, int? lines,
+            [TextAlign align = TextAlign.left]) =>
+        TextPainter(
+          text: TextSpan(
+            text: t,
+            style: TextStyle(
+              fontFamily: 'Cormorant',
+              fontSize: fs,
+              fontWeight: FontWeight.w400,
+              color: _white,
+              height: 1.2,
+              letterSpacing: fs * 0.07,
+              shadows: [
+                Shadow(color: const Color(0xCC000000), blurRadius: w * 0.008)
+              ],
+            ),
+          ),
+          textAlign: align,
+          textDirection: TextDirection.ltr,
+          textWidthBasis: TextWidthBasis.longestLine,
+          maxLines: lines,
+        );
+    final upper = text.toUpperCase();
+    final left = fitText(upper, w * _font, maxWidth, 2, build);
+    final fs = (left.text as TextSpan).style!.fontSize!;
+    final right = build(upper, fs, left.maxLines, TextAlign.right)
+      ..layout(maxWidth: maxWidth);
+    if (_texts.length > 300) _texts.clear();
+    return _texts[key] = (left, right);
   }
 
   List<_Option> _options(Size size, Offset p, String text) {
     final w = size.width, h = size.height;
-    final margin = w * 0.04, padH = w * 0.012, padV = w * 0.006;
+    final margin = w * 0.04, padH = w * _padH, padV = w * _padV;
     final frame = Rect.fromLTRB(margin, margin, w - margin, h - margin);
     final logo = logoZone(size).inflate(w * 0.01);
     final out = <_Option>[];
     final fallback = <_Option>[];
-    for (final (k, maxW) in [(0, 0.50), (1, 0.36)]) {
+    for (final (k, maxW) in [(0, 0.46), (1, 0.34)]) {
+      final (leftText, rightText) = _text(w, text, w * maxW);
+      final lines = leftText.computeLineMetrics().length;
+      if (k == 1 && lines < 2) continue; // и так в одну строку
+      // Чем сильнее пришлось уменьшить шрифт, тем хуже вариант.
+      final shrink =
+          1 - (leftText.text as TextSpan).style!.fontSize! / (w * _font);
       for (final side in [1, -1]) {
         // Справа текст прижат к левому краю, слева — к правому: так он
         // начинается от выноски.
-        final tp = _text(
-            w, text, side > 0 ? TextAlign.left : TextAlign.right, w * maxW);
-        if (k == 1 &&
-            !tp.didExceedMaxLines &&
-            tp.computeLineMetrics().length < 2) {
-          continue; // короткая подпись и так в одну строку
-        }
+        final tp = side > 0 ? leftText : rightText;
         final bw = tp.width + 2 * padH, bh = tp.height + 2 * padV;
         for (final up in [true, false]) {
           for (var n = 0; n < _reach.length; n++) {
@@ -151,7 +171,8 @@ class BadgePainter {
                 dx * 25 +
                 (up ? 0 : 3) +
                 (k == 1 ? 4 : 0) +
-                (tp.didExceedMaxLines ? 40 : 0) +
+                shrink * 60 +
+                (lines > 2 ? 40 : 0) +
                 ((side > 0) == (p.dx < w / 2) ? 0 : 2);
             final o = _Option(r, Offset(jx, jy), tp, cost);
             final inside = frame.contains(r.topLeft) &&
@@ -256,13 +277,13 @@ class BadgePainter {
     }
 
     for (final b in laid) {
-      canvas.drawRect(b.plaque.inflate(w * 0.01), smoke);
+      canvas.drawRect(b.plaque.inflate(w * 0.009), smoke);
     }
     for (final b in laid) {
       final r = b.plaque;
       stroke(b.point, b.joint);
       stroke(Offset(r.left, b.joint.dy), Offset(r.right, b.joint.dy));
-      b.text.paint(canvas, Offset(r.left + w * 0.012, r.top + w * 0.006));
+      b.text.paint(canvas, Offset(r.left + w * _padH, r.top + w * _padV));
       canvas.drawCircle(
           b.point, dotR + lw, Paint()..color = const Color(0x59000000));
       canvas.drawCircle(b.point, dotR, Paint()..color = _white);
