@@ -5,26 +5,32 @@ import 'package:flutter/painting.dart';
 
 import '../../models/post_draft.dart';
 
-/// Где оказалась плашка после раскладки (для отрисовки и для перетаскивания).
+/// Где оказалась подпись после раскладки (для отрисовки и для перетаскивания).
 class BadgeBox {
   final Offset point; // метка на детали
-  final Rect plaque; // сама плашка
+  final Rect plaque; // область подписи
   final TextPainter text;
   BadgeBox(this.point, this.plaque, this.text);
+
+  /// Подпись под меткой: линия у её верхнего края, иначе — у нижнего.
+  bool get below => plaque.top >= point.dy;
 }
 
-/// Плашки-выноски на не главных фото. Все размеры — доли ширины кадра,
-/// поэтому превью и полное разрешение выглядят одинаково.
+/// Выноски на не главных фото в стиле «линия»: точка на детали, тонкая
+/// вертикальная линия и подпись на горизонтальной черте, под подписью —
+/// мягкая тень без краёв. Все размеры — доли ширины кадра, поэтому превью
+/// и полное разрешение выглядят одинаково.
 class BadgePainter {
   static const _white = Color(0xFFFFFFFF);
 
-  /// Зона логотипа (слева сверху) — плашки туда не ставим.
+  /// Зона логотипа (слева сверху) — подписи туда не ставим.
   static Rect logoZone(Size s) =>
       Rect.fromLTWH(0, 0, s.width * 0.30, s.width * 0.165);
 
   List<BadgeBox> layout(Size size, List<PhotoBadge> badges) {
     final w = size.width, h = size.height;
-    final margin = w * 0.035, padH = w * 0.026, padV = w * 0.014;
+    final margin = w * 0.04, padH = w * 0.012, padV = w * 0.006;
+    final fs = w * 0.032;
     final boxes = <BadgeBox>[];
     for (final b in badges) {
       final p = Offset(b.x * w, b.y * h);
@@ -33,31 +39,37 @@ class BadgePainter {
           text: b.text.toUpperCase(),
           style: TextStyle(
             fontFamily: 'Cormorant',
-            fontSize: w * 0.034,
+            fontSize: fs,
             fontWeight: FontWeight.w400,
             color: _white,
-            height: 1.15,
-            letterSpacing: w * 0.034 * 0.04,
+            height: 1.2,
+            letterSpacing: fs * 0.07,
+            shadows: [
+              Shadow(color: const Color(0xCC000000), blurRadius: w * 0.008)
+            ],
           ),
         ),
-        textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
         maxLines: 2,
         ellipsis: '…',
-      )..layout(maxWidth: w * 0.46);
-      final pw = tp.width + 2 * padH, ph = tp.height + 2 * padV;
+      )..layout(maxWidth: w * 0.55);
+      final bw = tp.width + 2 * padH, bh = tp.height + 2 * padV;
 
-      // По умолчанию — над меткой, сдвинута к центру кадра.
-      final toRight = p.dx < w / 2;
-      final ax = p.dx + (toRight ? 1 : -1) * w * 0.07;
-      var r =
-          Rect.fromLTWH(toRight ? ax : ax - pw, p.dy - w * 0.11 - ph, pw, ph);
-      if (r.top < margin) r = r.translate(0, (p.dy + w * 0.11) - r.top);
-      r = _clamp(r, size, margin);
+      // Подпись начинается от линии метки — в ту сторону, где хватает места.
+      final fitsRight = p.dx + bw <= w - margin;
+      final fitsLeft = p.dx - bw >= margin;
+      final toRight = fitsRight && (p.dx < w * 0.55 || !fitsLeft);
+      final left = !fitsRight && !fitsLeft
+          ? p.dx - bw / 2
+          : (toRight ? p.dx : p.dx - bw);
+      final rise = w * 0.10;
+      var top = p.dy - rise - bh;
+      if (top < w * 0.2) top = p.dy + rise;
+      var r = _clamp(Rect.fromLTWH(left, top, bw, bh), size, margin);
       if (r.overlaps(logoZone(size))) {
-        r = Rect.fromLTWH(r.left, logoZone(size).bottom + margin * 0.5, pw, ph);
+        r = Rect.fromLTWH(r.left, logoZone(size).bottom + margin * 0.5, bw, bh);
       }
-      // Не налезать на уже поставленные плашки.
+      // Не налезать на уже поставленные подписи.
       for (var guard = 0; guard < 12; guard++) {
         final hit = boxes.where((o) => o.plaque.inflate(w * 0.012).overlaps(r));
         if (hit.isEmpty) break;
@@ -86,50 +98,37 @@ class BadgePainter {
       {List<BadgeBox>? boxes}) {
     final w = size.width;
     final laid = boxes ?? layout(size, badges);
+    final lw = math.max(1.0, w * 0.0013);
     final line = Paint()
-      ..color = _white.withValues(alpha: 0.85)
-      ..strokeWidth = math.max(1.0, w * 0.0018)
+      ..color = _white
+      ..strokeWidth = lw
       ..style = PaintingStyle.stroke;
     final halo = Paint()
-      ..color = const Color(0x59000000)
-      ..strokeWidth = math.max(2.0, w * 0.005)
+      ..color = const Color(0x55000000)
+      ..strokeWidth = lw * 3
       ..style = PaintingStyle.stroke;
-    final ringR = w * 0.013;
+    final smoke = Paint()
+      ..color = const Color(0x73000000)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.018);
+    final dotR = w * 0.0058;
+
+    void stroke(Offset a, Offset b) {
+      canvas.drawLine(a, b, halo);
+      canvas.drawLine(a, b, line);
+    }
 
     for (final b in laid) {
-      // Выноска: от края метки до ближайшей точки плашки.
-      final target = Offset(b.point.dx.clamp(b.plaque.left, b.plaque.right),
-          b.point.dy.clamp(b.plaque.top, b.plaque.bottom));
-      final v = target - b.point;
-      if (v.distance > ringR * 1.5) {
-        final start = b.point + v / v.distance * ringR;
-        canvas.drawLine(start, target, halo);
-        canvas.drawLine(start, target, line);
-      }
+      canvas.drawRect(b.plaque.inflate(w * 0.01), smoke);
     }
     for (final b in laid) {
-      final rr = RRect.fromRectAndRadius(b.plaque, Radius.circular(w * 0.012));
-      canvas.drawRRect(rr, Paint()..color = const Color(0x8C000000));
-      canvas.drawRRect(
-          rr,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = math.max(1.0, w * 0.0016)
-            ..color = _white.withValues(alpha: 0.55));
-      b.text.paint(
-          canvas,
-          Offset(b.plaque.center.dx - b.text.width / 2,
-              b.plaque.center.dy - b.text.height / 2));
-      // Метка: кольцо с точкой, с тёмным ореолом для читаемости.
-      canvas.drawCircle(b.point, ringR, halo);
+      final r = b.plaque;
+      final y = b.below ? r.top : r.bottom;
+      stroke(b.point, Offset(b.point.dx, y));
+      stroke(Offset(r.left, y), Offset(r.right, y));
+      b.text.paint(canvas, Offset(r.left + w * 0.012, r.top + w * 0.006));
       canvas.drawCircle(
-          b.point,
-          ringR,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = math.max(1.2, w * 0.0025)
-            ..color = _white);
-      canvas.drawCircle(b.point, w * 0.0045, Paint()..color = _white);
+          b.point, dotR + lw * 1.5, Paint()..color = const Color(0x66000000));
+      canvas.drawCircle(b.point, dotR, Paint()..color = _white);
     }
   }
 }
