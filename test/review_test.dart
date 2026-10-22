@@ -144,4 +144,25 @@ void main() {
         scrollable: find.byType(Scrollable).first);
     expect(find.text('Применить и обновить превью'), findsOneWidget);
   });
+
+  test('Фото скопом: первое — главное, нажатие меняет главное местами', () {
+    final s = AppState();
+    s.addPhotos(['a', 'b', 'c', 'd']);
+    expect(s.draft.mainPath, 'a');
+    expect(s.draft.otherPaths, ['b', 'c', 'd']);
+
+    s.setMain('c'); // главное меняется местами с выбранным
+    expect(s.draft.mainPath, 'c');
+    expect(s.draft.otherPaths, ['b', 'a', 'd']);
+
+    s.addPhotos(['d', 'e']); // повторы не добавляются
+    expect(s.draft.otherPaths, ['b', 'a', 'd', 'e']);
+
+    s.removePhoto('c'); // убрали главное — главным стало первое из остальных
+    expect(s.draft.mainPath, 'b');
+    expect(s.draft.otherPaths, ['a', 'd', 'e']);
+
+    s.removePhoto('d');
+    expect(s.draft.otherPaths, ['a', 'e']);
+  });
 }

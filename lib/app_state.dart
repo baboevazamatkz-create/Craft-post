@@ -28,26 +28,44 @@ class AppState extends ChangeNotifier {
   String? lastSaveError;
   Future<void> _queue = Future.value();
 
-  Future<void> pickMain() async {
-    final f = await _picker.pickImage(source: ImageSource.gallery);
-    if (f == null) return;
-    // Новое главное фото у поста из истории — это уже новый пост.
-    if (draft.id != null) reset();
-    draft.mainPath = f.path;
-    draft.otherPaths.remove(f.path);
-    notifyListeners();
-  }
-
-  Future<void> pickOthers() async {
+  /// Выбор фото скопом (можно сразу все). Новые добавляются к уже
+  /// выбранным; если главного ещё нет — им становится первое из выбранных.
+  Future<void> pickPhotos() async {
     final files = await _picker.pickMultiImage();
     if (files.isEmpty) return;
-    draft.otherPaths =
-        files.map((f) => f.path).where((p) => p != draft.mainPath).toList();
+    addPhotos([for (final f in files) f.path]);
+  }
+
+  void addPhotos(List<String> paths) {
+    final known = {draft.mainPath, ...draft.otherPaths};
+    final fresh = [
+      for (final p in paths)
+        if (!known.contains(p)) p
+    ];
+    if (fresh.isEmpty) return;
+    draft.mainPath ??= fresh.removeAt(0);
+    draft.otherPaths = [...draft.otherPaths, ...fresh];
     notifyListeners();
   }
 
-  void removeOther(String path) {
-    draft.otherPaths.remove(path);
+  /// Делает фото главным: оно меняется местами с текущим главным.
+  void setMain(String path) {
+    final i = draft.otherPaths.indexOf(path);
+    if (i < 0 || draft.mainPath == null) return;
+    draft.otherPaths[i] = draft.mainPath!;
+    draft.mainPath = path;
+    notifyListeners();
+  }
+
+  /// Убирает фото из поста. Если убрали главное — главным становится
+  /// первое из остальных.
+  void removePhoto(String path) {
+    if (path == draft.mainPath) {
+      draft.mainPath =
+          draft.otherPaths.isEmpty ? null : draft.otherPaths.removeAt(0);
+    } else {
+      draft.otherPaths.remove(path);
+    }
     notifyListeners();
   }
 
