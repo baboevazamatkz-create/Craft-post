@@ -28,7 +28,7 @@ Android-приложение (Flutter) для подготовки постов 
    ещё раз или сохранить их.
 
 ## Сборка APK
-Без установки: GitHub → Actions → «Build» → последний запуск → артефакт `craft-posts-apk`.
+Без установки: GitHub → Actions → «Build» → последний запуск → артефакт `craft-post-apk`.
 
 Локально (нужны Flutter и Android SDK):
 ```
@@ -38,11 +38,11 @@ flutter build apk --release  # build/app/outputs/flutter-apk/app-release.apk
 ```
 
 ## Веб-версия
-Тот же код собирается для браузера (`./tool/setup_web.sh && flutter build web`).
+Тот же код собирается для браузера (`./tool/setup_web.sh && flutter build web --no-web-resources-cdn`).
 Отличия от телефона: готовые фото скачиваются в «Загрузки» браузера,
 история постов хранится в IndexedDB браузера, ключ AI — в хранилище
 браузера. Каждый пуш в `main` публикует её на GitHub Pages:
-https://baboevazamatkz-create.github.io/craft-posts/ (workflow `build.yml`).
+https://baboevazamatkz-create.github.io/Craft-post/ (workflow `build.yml`).
 
 ## Установка на телефон
 1. Скопируйте `app-release.apk` на телефон.

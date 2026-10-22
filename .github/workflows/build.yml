@@ -32,7 +32,7 @@ jobs:
           exit 1
       - uses: actions/upload-artifact@v4
         with:
-          name: craft-posts-apk
+          name: craft-post-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
   web:
@@ -43,10 +43,10 @@ jobs:
         with: { channel: stable, cache: true }
       - run: ./tool/setup_web.sh
       - run: flutter pub get
-      - run: flutter build web --release --base-href /craft-posts/ --no-web-resources-cdn
+      - run: flutter build web --release --no-web-resources-cdn
       - uses: actions/upload-artifact@v4
         with:
-          name: craft-posts-web
+          name: craft-post-web
           path: build/web
       - name: Опубликовать на GitHub Pages
         if: github.ref == 'refs/heads/main'
