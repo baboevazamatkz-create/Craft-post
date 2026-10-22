@@ -1,6 +1,7 @@
-# Сборка приложения CRAFT Посты.
-# - Любой пуш: проверки, тесты, APK и веб-версия (архивы в Artifacts).
+# Проверка и веб-версия CRAFT Посты.
+# - Любой пуш: анализ кода, тесты, сборка веб-версии (архив в Artifacts).
 # - Пуш в main: веб-версия публикуется на GitHub Pages (ветка gh-pages).
+# APK собирается отдельно и только по запросу — см. apk.yml.
 name: Build
 
 on:
@@ -11,56 +12,16 @@ permissions:
   contents: write
 
 jobs:
-  apk:
+  # Быстрая проверка при каждой правке: анализ кода и тесты (без сборки APK).
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: '17' }
       - uses: subosito/flutter-action@v2
         with: { channel: stable, cache: true }
-      - run: ./tool/setup_android.sh
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
-      # Постоянная подпись: одна и та же у всех сборок, поэтому новая версия
-      # ставится поверх старой и ключ AI с историей постов сохраняются.
-      - name: Подпись APK из секретов
-        env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: |
-          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
-            echo "::warning::Секреты подписи не заданы: APK подписан временным ключом и не встанет поверх прошлой версии"
-            exit 0
-          fi
-          echo "$KEYSTORE_B64" | base64 -d > android/app/upload.p12
-          printf 'storeFile=upload.p12\nstorePassword=%s\nkeyAlias=craft\nkeyPassword=%s\n' \
-            "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > android/key.properties
-      # Загрузка Gradle/NDK иногда обрывается — повторяем до 3 раз.
-      - run: |
-          for i in 1 2 3; do
-            flutter build apk --release && exit 0
-            echo "Сборка не удалась (попытка $i), повтор"; sleep 10
-          done
-          exit 1
-      # Проверка: APK подписан именно постоянным ключом CRAFT (SHA-256 сертификата).
-      - name: Проверка подписи APK
-        env:
-          HAS_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-          EXPECTED: 67842b0960bef953cc679814307f6368b38a7d132f15cd6bd4455180505336ca
-        run: |
-          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
-          OUT=$("$BT/apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk)
-          echo "$OUT" | grep -E "certificate (DN|SHA-256)"
-          ACTUAL=$(echo "$OUT" | grep -m1 "certificate SHA-256 digest" | awk '{print $NF}')
-          if [ "$HAS_KEY" = "true" ] && [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "::error::APK подписан не постоянным ключом CRAFT ($ACTUAL)"; exit 1
-          fi
-      - uses: actions/upload-artifact@v4
-        with:
-          name: craft-post-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
 
   web:
     runs-on: ubuntu-latest
