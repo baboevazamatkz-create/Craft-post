@@ -197,20 +197,64 @@ void main() {
     expect(back.badgesOf('idb:1/photo_0').single.y, 0.6);
   });
 
-  test('Раскладка плашек: в кадре, мимо логотипа, без наложений', () {
+  test('Раскладка плашек: в кадре, без наложений и пересечений, углы тупые',
+      () {
     const size = Size(1080, 1440);
-    final boxes = BadgePainter().layout(size, [
-      PhotoBadge('Ровная укладка кабеля', 0.1, 0.05), // под логотипом
-      PhotoBadge('Укладка под лазер', 0.12, 0.08),
-      PhotoBadge('Плотное прилегание', 0.9, 0.98),
-    ]);
     final frame = Offset.zero & size;
-    for (final b in boxes) {
-      expect(frame.contains(b.plaque.topLeft), isTrue);
-      expect(frame.contains(b.plaque.bottomRight), isTrue);
-      expect(b.plaque.overlaps(BadgePainter.logoZone(size)), isFalse);
+    double cross(Offset o, Offset a, Offset b) =>
+        (a.dx - o.dx) * (b.dy - o.dy) - (a.dy - o.dy) * (b.dx - o.dx);
+    bool segSeg(Offset a, Offset b, Offset c, Offset d) =>
+        ((cross(c, d, a) > 0) != (cross(c, d, b) > 0)) &&
+        ((cross(a, b, c) > 0) != (cross(a, b, d) > 0));
+    bool segRect(Offset a, Offset b, Rect r) =>
+        r.contains(a) ||
+        r.contains(b) ||
+        segSeg(a, b, r.topLeft, r.topRight) ||
+        segSeg(a, b, r.topRight, r.bottomRight) ||
+        segSeg(a, b, r.bottomRight, r.bottomLeft) ||
+        segSeg(a, b, r.bottomLeft, r.topLeft);
+
+    final cases = [
+      [
+        PhotoBadge('Ровная укладка кабеля', 0.1, 0.05), // под логотипом
+        PhotoBadge('Укладка под лазер', 0.12, 0.08),
+        PhotoBadge('Плотное прилегание', 0.9, 0.98),
+      ],
+      [
+        PhotoBadge('Жгут без единого перехлёста', 0.39, 0.25),
+        PhotoBadge('Реле напряжения от скачков', 0.22, 0.60),
+        PhotoBadge('Щит утоплен в стену', 0.43, 0.63),
+      ],
+      [
+        PhotoBadge('Три подрозетника — одна ось', 0.25, 0.63),
+        PhotoBadge('Запас кабеля под подключение', 0.45, 0.62),
+        PhotoBadge('Ввод сверху', 0.48, 0.45),
+      ],
+    ];
+    for (final badges in cases) {
+      final boxes = BadgePainter().layout(size, badges);
+      for (final b in boxes) {
+        expect(frame.contains(b.plaque.topLeft), isTrue);
+        expect(frame.contains(b.plaque.bottomRight), isTrue);
+        expect(b.plaque.overlaps(BadgePainter.logoZone(size)), isFalse);
+        // Полка уходит от метки: угол между выноской и полкой тупой.
+        final toShelf = b.plaque.center.dx - b.joint.dx;
+        final toPoint = b.point.dx - b.joint.dx;
+        expect(toShelf * toPoint, lessThan(0), reason: badges.first.text);
+      }
+      for (var i = 0; i < boxes.length; i++) {
+        for (var j = 0; j < boxes.length; j++) {
+          if (i == j) continue;
+          final a = boxes[i], b = boxes[j];
+          expect(a.plaque.overlaps(b.plaque), isFalse);
+          expect(segRect(a.point, a.joint, b.plaque), isFalse,
+              reason: '${badges[i].text} → ${badges[j].text}');
+          expect(b.plaque.contains(a.point), isFalse);
+          if (i < j)
+            expect(segSeg(a.point, a.joint, b.point, b.joint), isFalse);
+        }
+      }
     }
-    expect(boxes[0].plaque.overlaps(boxes[1].plaque), isFalse);
   });
 
   testWidgets('Превью: кнопка плашек через AI и правка на каждом фото',
