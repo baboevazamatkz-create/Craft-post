@@ -5,18 +5,31 @@ import '../../models/post_draft.dart';
 import '../../models/icon_library.dart';
 import 'ai_provider.dart';
 
-/// Работает без сети и ключа: собирает текст из полей формы.
+/// Работает без сети и ключа: собирает текст из полей формы. Нужна только
+/// для проверки приложения; настоящие преимущества и значки рисует AI.
 class StubAiProvider implements AiProvider {
   @override
   String get id => 'stub';
   @override
   String get title => 'Заглушка (без AI)';
 
+  static const _ideas = [
+    'Автоматика день-ночь',
+    'Дистанционная настройка',
+    'Работа на высоте',
+    'Скрытая проводка',
+    'Защита от скачков',
+    'Запуск за 1 день',
+    'Маркировка линий',
+    'Монтаж без пыли',
+    'Запас мощности',
+    'Гарантия 3 года',
+  ];
+
   @override
   Future<AiResult> generate({
     required Uint8List mainPhotoJpeg,
     required Map<String, String> fields,
-    required List<Feature> features,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 600));
     String f(String k) => (fields[k] ?? '').trim();
@@ -38,38 +51,39 @@ class StubAiProvider implements AiProvider {
     return AiResult(
       caption,
       InfographicText(
-        title: f('object'),
-        subtitle: f('work'),
-        location: f('location'),
-        features: [
-          for (final x in features) Feature(guessIcon(x.text), x.text)
-        ],
-      ),
+          title: f('object'), subtitle: f('work'), location: f('location')),
+      _ideas.take(kFeatureIdeas).toList(),
     );
   }
 
-  /// Без AI: для каждого преимущества три разных встроенных значка,
-  /// первый — подобранный по смыслу подписи.
   @override
-  Future<IconIdeas> suggestIcons({
-    required Uint8List mainPreviewJpeg,
-    required InfographicText current,
+  Future<List<String>> suggestFeatures({
+    required Uint8List mainPhotoJpeg,
+    required Map<String, String> fields,
+    required List<String> exclude,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    return [
+      for (final i in _ideas)
+        if (!exclude.contains(i)) i
+    ];
+  }
+
+  /// Без AI: случайные встроенные значки, только чтобы пройти шаг.
+  @override
+  Future<List<List<List<String>>>> suggestIcons({
+    required List<String> features,
     required String instruction,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 400));
     final rnd = Random();
-    return IconIdeas([
-      for (final f in current.features)
-        FeatureIdeas(f.text, () {
-          final keys = <String>[guessIcon(f.text)];
-          final rest = [for (final i in kIcons) i.key]..shuffle(rnd);
-          for (final k in rest) {
-            if (keys.length >= kIconVariants) break;
-            if (!keys.contains(k) && k != f.icon) keys.add(k);
-          }
-          return [for (final k in keys) iconByKey(k).paths];
-        }()),
-    ]);
+    return [
+      for (final _ in features)
+        [
+          for (final i in ([...kIcons]..shuffle(rnd)).take(kIconVariants))
+            i.paths
+        ],
+    ];
   }
 
   /// Без AI: по одной плашке на фото из пунктов «Что сделано» (или общие

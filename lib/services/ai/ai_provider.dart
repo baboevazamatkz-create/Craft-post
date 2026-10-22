@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import '../../models/icon_library.dart';
 import '../../models/post_draft.dart';
 
 /// Общий интерфейс. Чтобы добавить провайдера: реализовать класс
@@ -10,19 +9,24 @@ abstract class AiProvider {
   String get id;
   String get title;
 
-  /// Отправляет ТОЛЬКО главное фото (уменьшенное JPEG) и текст полей.
+  /// По главному фото (уменьшенное JPEG) и полям формы: подпись к посту,
+  /// тексты инфографики и [kFeatureIdeas] вариантов преимуществ на выбор.
   Future<AiResult> generate({
     required Uint8List mainPhotoJpeg,
     required Map<String, String> fields,
-    required List<Feature> features,
   });
 
-  /// AI-редактор главного фото: по превью с инфографикой и пожеланию
-  /// предлагает несколько вариантов каждого значка (и, если просили,
-  /// новые подписи).
-  Future<IconIdeas> suggestIcons({
-    required Uint8List mainPreviewJpeg,
-    required InfographicText current,
+  /// Ещё варианты преимуществ, не похожие на [exclude].
+  Future<List<String>> suggestFeatures({
+    required Uint8List mainPhotoJpeg,
+    required Map<String, String> fields,
+    required List<String> exclude,
+  });
+
+  /// Значки к выбранным преимуществам: для каждого — [kIconVariants]
+  /// разных по идее варианта (наборы SVG-путей). Фото не отправляется.
+  Future<List<List<List<String>>>> suggestIcons({
+    required List<String> features,
     required String instruction,
   });
 
@@ -36,70 +40,77 @@ abstract class AiProvider {
   });
 }
 
+/// Сколько вариантов преимуществ предлагать за раз.
+const kFeatureIdeas = 8;
+
 /// Сколько вариантов значка просить для каждого преимущества.
 const kIconVariants = 3;
 
-class FeatureIdeas {
-  final String text; // предложенная подпись (может совпадать с текущей)
-  final List<List<String>> variants; // варианты значка — наборы SVG-путей
-  FeatureIdeas(this.text, this.variants);
-}
+const _featureRules =
+    'Преимущество — 1–3 слова для нижней строки инфографики под значком: '
+    'конкретно про этот объект и эти работы — что получил заказчик или чем '
+    'работа особенная. Варианты разные по смыслу. Без общих слов вроде '
+    '«Качество», «Надёжность», «Профессионализм». Уровень примеров: '
+    '«Автоматика день-ночь», «Дистанционная настройка», «Работа на высоте», '
+    '«Скрытая проводка», «Запуск за 1 день», «Защита от скачков». '
+    'Не выдумывай того, чего нет на фото и в данных.';
 
-class IconIdeas {
-  final String? title;
-  final String? subtitle;
-  final List<FeatureIdeas> features;
-  IconIdeas(this.features, {this.title, this.subtitle});
-}
+const kFeatureSystemPrompt =
+    'Ты SMM-помощник компании CRAFT SYSTEM (электромонтаж). По фото объекта '
+    'и данным предложи новые варианты преимуществ для инфографики, не '
+    'похожие на уже предложенные. $_featureRules '
+    'Ответ строго JSON без пояснений: {"features": ["...", "..."]}';
 
 const kIconSystemPrompt =
     'Ты дизайнер тонких линейных пиктограмм для премиальной инфографики '
-    'компании-электромонтажника. На фото — пост с инфографикой: внизу три '
-    'преимущества, у каждого значок и подпись. Нарисуй для каждого '
-    'преимущества $kIconVariants РАЗНЫХ по идее значка (разные метафоры, а '
-    'не одна и та же картинка с мелкими отличиями). '
+    'компании-электромонтажника. Внизу инфографики три преимущества, у '
+    'каждого значок над подписью. Нарисуй для каждого преимущества '
+    '$kIconVariants РАЗНЫХ по идее значка (разные метафоры, а не одна и та же '
+    'картинка с мелкими отличиями). '
     'Стиль: как в архитектурных и инженерных презентациях — тонкая линия '
     'одной толщины, без заливки, скруглённые концы, достаточно деталей, '
     'чтобы рисунок был интересным и узнаваемым (например: солнце с лучами и '
     'полумесяц — «день-ночь»; пульт с кнопками — «дистанционная настройка»; '
     'монтажник на стремянке — «работа на высоте»; лампа с лучами; '
-    'ступени; щит с галочкой; знак заземления; велосипед-пенни-фартинг — '
-    '«ретро»). Не используй банальную молнию, если есть идея точнее. '
+    'ступени; щит с галочкой; знак заземления). Не используй банальную '
+    'молнию, если есть идея точнее. '
     'Технически: сетка 24x24, всё внутри 1..23, 3–12 SVG-путей на значок '
     '(атрибут d; команды M L H V C S Q T A Z), без текста и цифр внутри, '
     'мелкие детали не меньше 1 единицы, линии не сливаются. '
-    'Учти пожелание пользователя. Подписи и заголовки меняй, только если '
-    'пожелание об этом; иначе верни их как есть. '
-    'Ответ строго JSON без пояснений: {"title": "...", "subtitle": "...", '
-    '"features": [{"text": "...", "variants": [["d", "d"], ["d"], ["d"]]}]}';
+    'Учти пожелание пользователя. '
+    'Ответ строго JSON без пояснений: {"features": [{"text": "...", '
+    '"variants": [["d", "d"], ["d"], ["d"]]}]} — в том же порядке, что '
+    'преимущества в запросе.';
 
-String iconRequestText(InfographicText t, String instruction) {
-  final lines = <String>[
-    'Заголовок: ${t.title}',
-    'Подзаголовок: ${t.subtitle}',
-    for (var i = 0; i < t.features.length; i++)
-      'Преимущество ${i + 1}: ${t.features[i].text}',
-    'Пожелание: ${instruction.trim().isEmpty ? 'сделай значки интереснее и разнообразнее' : instruction.trim()}',
+String iconRequestText(List<String> features, String instruction) => [
+      for (var i = 0; i < features.length; i++)
+        'Преимущество ${i + 1}: ${features[i]}',
+      'Пожелание: ${instruction.trim().isEmpty ? 'интересные, разнообразные значки' : instruction.trim()}',
+    ].join('\n');
+
+/// Варианты значков по порядку преимуществ; мусор отбрасывается.
+List<List<List<String>>> parseIconJson(String raw, int count) {
+  final list = (_jsonObject(raw)['features'] as List?) ?? [];
+  return [
+    for (var i = 0; i < count; i++)
+      [
+        if (i < list.length && list[i] is Map)
+          for (final v in ((list[i] as Map)['variants'] as List? ?? []))
+            sanitizeSvgPaths(v),
+      ].where((v) => v.isNotEmpty).toList(),
   ];
-  return lines.join('\n');
 }
 
-IconIdeas parseIconJson(String raw, InfographicText current) {
-  final m = _jsonObject(raw);
-  final list = (m['features'] as List?) ?? [];
-  final features = <FeatureIdeas>[];
-  for (var i = 0; i < current.features.length; i++) {
-    final e = i < list.length ? list[i] as Map<String, dynamic> : const {};
-    final variants = [
-      for (final v in (e['variants'] as List? ?? [])) sanitizeSvgPaths(v),
-    ].where((v) => v.isNotEmpty).toList();
-    final text = '${e['text'] ?? ''}'.trim();
-    features.add(
-        FeatureIdeas(text.isEmpty ? current.features[i].text : text, variants));
+/// Список преимуществ из JSON: строки или объекты с полем text.
+List<String> parseFeatureJson(String raw) => _features(_jsonObject(raw));
+
+List<String> _features(Map<String, dynamic> m) {
+  final out = <String>[];
+  for (final e in (m['features'] as List? ?? [])) {
+    final t = (e is Map ? '${e['text'] ?? ''}' : '$e').trim();
+    if (t.isNotEmpty && t.length <= 40 && !out.contains(t)) out.add(t);
   }
-  String? opt(Object? v) => v == null || '$v'.trim().isEmpty ? null : '$v';
-  return IconIdeas(features,
-      title: opt(m['title']), subtitle: opt(m['subtitle']));
+  return out;
 }
 
 Map<String, dynamic> _jsonObject(String raw) {
@@ -127,26 +138,36 @@ abstract class ChatAiProvider implements AiProvider {
   Future<AiResult> generate({
     required Uint8List mainPhotoJpeg,
     required Map<String, String> fields,
-    required List<Feature> features,
   }) async =>
       parseAiJson(await ask(
           system: kSystemPrompt,
-          text: fieldsToText(fields, features),
+          text: fieldsToText(fields),
           images: [mainPhotoJpeg]));
 
   @override
-  Future<IconIdeas> suggestIcons({
-    required Uint8List mainPreviewJpeg,
-    required InfographicText current,
+  Future<List<String>> suggestFeatures({
+    required Uint8List mainPhotoJpeg,
+    required Map<String, String> fields,
+    required List<String> exclude,
+  }) async =>
+      parseFeatureJson(await ask(
+          system: kFeatureSystemPrompt,
+          text: '${fieldsToText(fields)}\n\nУже предложены: '
+              '${exclude.join('; ')}\n\nПредложи ещё $kFeatureIdeas.',
+          images: [mainPhotoJpeg]));
+
+  @override
+  Future<List<List<List<String>>>> suggestIcons({
+    required List<String> features,
     required String instruction,
   }) async =>
       parseIconJson(
           await ask(
               system: kIconSystemPrompt,
-              text: iconRequestText(current, instruction),
-              images: [mainPreviewJpeg],
+              text: iconRequestText(features, instruction),
+              images: const [],
               effort: 'high'),
-          current);
+          features.length);
 
   @override
   Future<List<List<PhotoBadge>>> suggestBadges({
@@ -169,7 +190,7 @@ abstract class ChatAiProvider implements AiProvider {
           otherJpegs.length);
 }
 
-final kSystemPrompt =
+const kSystemPrompt =
     'Ты SMM-помощник компании CRAFT SYSTEM (электромонтажные работы для '
     'бизнеса и частных домов, г. Черкесск). По фото и данным объекта составь '
     'подпись к Instagram-посту строго в таком формате:\n'
@@ -180,51 +201,34 @@ final kSystemPrompt =
     'Деловой тон, без хэштегов. Не выдумывай факты и цифры: опирайся на '
     'поля формы и фото. '
     'Для инфографики верни title (название объекта), subtitle (тип работ), '
-    'location, features — ровно $kFeatureCount преимущества: короткая подпись '
-    '(1–3 слова, КАПС не нужен) и значок. Значок нарисуй сам: icon_paths — '
-    'массив SVG-путей (атрибут d) в сетке 24x24, только тонкий контур без '
-    'заливки, простой и узнаваемый (как линейные иконки), команды M L H V C A Z. '
-    'Если не уверен в рисунке — оставь icon_paths пустым и выбери icon из '
-    'списка: ${kIcons.map((i) => i.key).join(", ")}. '
-    'Если преимущества заданы в форме, оставь их текст, иначе придумай их по работам. '
+    'location и features — $kFeatureIdeas вариантов преимуществ на выбор, '
+    'самые сильные первыми. $_featureRules '
     'Ответ строго JSON без пояснений: {"caption": "...", "title": "...", '
-    '"subtitle": "...", "location": "...", '
-    '"features": [{"text": "...", "icon": "...", "icon_paths": ["..."]}]}';
+    '"subtitle": "...", "location": "...", "features": ["...", "..."]}';
 
-String fieldsToText(Map<String, String> fields, List<Feature> features) {
+String fieldsToText(Map<String, String> fields,
+    [List<String> features = const []]) {
   final labels = {for (final f in kInfographicFields) f.key: f.label};
-  final lines = fields.entries
-      .where((e) => e.value.trim().isNotEmpty)
-      .map((e) => '${labels[e.key] ?? e.key}: ${e.value}')
-      .toList();
-  for (var i = 0; i < features.length; i++) {
-    if (features[i].text.trim().isNotEmpty) {
-      lines.add('Преимущество ${i + 1}: ${features[i].text} ');
-    }
-  }
-  return lines.join('\n');
+  return [
+    for (final e in fields.entries)
+      if (e.value.trim().isNotEmpty) '${labels[e.key] ?? e.key}: ${e.value}',
+    for (var i = 0; i < features.length; i++)
+      if (features[i].trim().isNotEmpty)
+        'Преимущество ${i + 1}: ${features[i]}',
+  ].join('\n');
 }
 
 /// Разбирает JSON из ответа модели (допускает обёртку ```json).
 AiResult parseAiJson(String raw) {
   final m = _jsonObject(raw);
-  final features = ((m['features'] as List?) ?? []).map((e) {
-    final text = '${e['text'] ?? ''}';
-    final icon = '${e['icon'] ?? ''}';
-    return Feature(
-      kIcons.any((i) => i.key == icon) ? icon : guessIcon(text),
-      text,
-      sanitizeSvgPaths(e['icon_paths']),
-    );
-  }).toList();
   return AiResult(
     '${m['caption'] ?? ''}',
     InfographicText(
       title: '${m['title'] ?? ''}',
       subtitle: '${m['subtitle'] ?? ''}',
       location: '${m['location'] ?? ''}',
-      features: features,
     ),
+    _features(m),
   );
 }
 

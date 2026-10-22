@@ -76,41 +76,59 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Шаг «Создать»: AI (главное фото + поля), превью всех фото
-  /// и запись поста в историю приложения.
+  Future<AiProvider> _ai() async =>
+      createAiProvider(await settings.provider(), await settings.apiKey());
+
+  /// Шаг «Создать»: AI (главное фото + поля) пишет подпись, тексты
+  /// инфографики и варианты преимуществ. Превью — после выбора значков.
   Future<void> generate() async {
-    final providerId = await settings.provider();
-    final ai = createAiProvider(providerId, await settings.apiKey());
+    final ai = await _ai();
     final photo = await processor.aiPhoto(draft.mainPath!);
-    final result = await ai.generate(
-        mainPhotoJpeg: photo, fields: draft.fields, features: draft.features);
+    final result =
+        await ai.generate(mainPhotoJpeg: photo, fields: draft.fields);
     draft.caption = result.caption;
     draft.infographic = result.infographic
       ..stat = draft.fields['stat'] ?? ''
       ..unit = draft.fields['unit'] ?? '';
+    draft.featureIdeas = result.featureIdeas;
     draft.saved = List.filled(draft.imageCount, false);
     saveStates = List.filled(draft.imageCount, SaveState.none);
-    await refreshPreviews();
+    notifyListeners();
   }
 
-  /// AI-редактор главного фото: варианты значков по текущему превью.
-  /// В AI уходит только главное фото (превью с инфографикой) и тексты.
-  Future<IconIdeas> suggestIcons(String instruction) async {
-    final ai =
-        createAiProvider(await settings.provider(), await settings.apiKey());
-    final jpeg = draft.mainPreview ?? await processor.aiPhoto(draft.mainPath!);
-    return ai.suggestIcons(
-        mainPreviewJpeg: jpeg,
-        current: draft.infographic,
-        instruction: instruction);
+  /// Ещё варианты преимуществ; новые добавляются в конец списка.
+  Future<int> moreFeatureIdeas() async {
+    final ai = await _ai();
+    final photo = await processor.aiPhoto(draft.mainPath!, maxSide: 768);
+    final fresh = await ai.suggestFeatures(
+        mainPhotoJpeg: photo,
+        fields: draft.fields,
+        exclude: draft.featureIdeas);
+    final added = [
+      for (final f in fresh)
+        if (!draft.featureIdeas.contains(f)) f
+    ];
+    draft.featureIdeas = [...draft.featureIdeas, ...added];
+    notifyListeners();
+    return added.length;
+  }
+
+  /// Значки к выбранным преимуществам (в AI уходят только их подписи).
+  Future<List<List<List<String>>>> suggestIcons(
+          List<String> features, String instruction) async =>
+      (await _ai()).suggestIcons(features: features, instruction: instruction);
+
+  /// Выбранные преимущества со значками — на главное фото, затем превью.
+  Future<void> setFeatures(List<Feature> features) async {
+    draft.infographic.features = features;
+    await refreshPreviews();
   }
 
   /// Плашки через AI: в AI уходят ВСЕ фото поста (главное — для понимания
   /// объекта), плашки ставятся на не главные. Существующие плашки заменяются.
   Future<int> suggestBadges() async {
     if (draft.otherPaths.isEmpty) return 0;
-    final ai =
-        createAiProvider(await settings.provider(), await settings.apiKey());
+    final ai = await _ai();
     final main = await processor.aiPhoto(draft.mainPath!, maxSide: 768);
     final others = [
       for (final p in draft.otherPaths) await processor.aiPhoto(p)
@@ -118,7 +136,8 @@ class AppState extends ChangeNotifier {
     final result = await ai.suggestBadges(
         mainJpeg: main,
         otherJpegs: others,
-        context: fieldsToText(draft.fields, draft.features));
+        context: fieldsToText(draft.fields,
+            [for (final f in draft.infographic.features) f.text]));
     var count = 0;
     for (var i = 0; i < draft.otherPaths.length; i++) {
       draft.badges[draft.otherPaths[i]] = result[i];

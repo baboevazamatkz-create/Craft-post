@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:craft_post/app_state.dart';
 import 'package:craft_post/models/post_draft.dart';
-import 'package:craft_post/screens/ai_icons_screen.dart';
+import 'package:craft_post/screens/features_screen.dart';
 import 'package:craft_post/screens/preview_screen.dart';
 import 'package:craft_post/services/ai/ai_provider.dart';
 import 'package:craft_post/services/image/badges.dart';
@@ -23,6 +23,10 @@ AppState stateWith3Photos() {
     ..mainPath = '/x/main.jpg'
     ..otherPaths = ['/x/1.jpg', '/x/2.jpg']
     ..caption = 'Подпись'
+    ..infographic = InfographicText(features: [
+      for (final t in ['Скрытая проводка', 'Работа на высоте', 'Свет'])
+        Feature('bolt', t, ['M4 4h16v16H4z'])
+    ])
     ..mainPreview = jpg()
     ..otherPreviews = [jpg(), jpg()]
     ..saved = [false, false, false];
@@ -55,7 +59,7 @@ void main() {
         Feature('bolt', 'Свет', ['M1 1L2 2'])
       ]);
     d.fields['object'] = 'АЗС';
-    d.features[0].text = 'Свет';
+    d.featureIdeas = ['Свет', 'Щит'];
     final r = PostDraft.fromJson(d.toJson());
     expect(r.id, '42');
     expect(r.otherPaths, ['/a/1.jpg']);
@@ -63,7 +67,7 @@ void main() {
     expect(r.infographic.stat, '320');
     expect(r.infographic.features.single.svg, ['M1 1L2 2']);
     expect(r.fields['object'], 'АЗС');
-    expect(r.features[0].text, 'Свет');
+    expect(r.featureIdeas, ['Свет', 'Щит']);
     expect(r.imageCount, 2);
   });
 
@@ -109,41 +113,57 @@ void main() {
     expect(find.byType(InteractiveViewer), findsWidgets);
   });
 
-  test('parseIconJson: варианты значков, мусор отбрасывается', () {
-    final cur = InfographicText(features: [
-      Feature('bolt', 'Свет'),
-      Feature('bolt', 'Щит'),
-    ]);
+  test('parseIconJson: варианты значков по порядку, мусор отбрасывается', () {
     final r = parseIconJson(
-        '```json\n{"title":"","features":[{"text":"Свет","variants":'
+        '```json\n{"features":[{"text":"Свет","variants":'
         '[["M2 2L22 22","M4 4h16"],["<script>"],["M12 3a9 9 0 1 0 0.01 0"]]},'
-        '{"text":"Электрощит","variants":[["M4 3h16v18H4z"]]}]}\n```',
-        cur);
-    expect(r.features[0].variants.length, 2); // «<script>» отброшен
-    expect(r.features[1].text, 'Электрощит');
-    expect(r.title, isNull);
+        '{"text":"Щит","variants":[["M4 3h16v18H4z"]]}]}\n```',
+        3);
+    expect(r.length, 3);
+    expect(r[0].length, 2); // «<script>» отброшен
+    expect(r[1].single, ['M4 3h16v18H4z']);
+    expect(r[2], isEmpty);
   });
 
-  testWidgets('AI-редактор: без ключа предлагает варианты встроенных значков',
+  test('parseFeatureJson: строки и объекты, без повторов и пустых', () {
+    expect(
+        parseFeatureJson('{"features":["Скрытая проводка",{"text":"Работа '
+            'на высоте"},"","Скрытая проводка"]}'),
+        ['Скрытая проводка', 'Работа на высоте']);
+  });
+
+  testWidgets('Преимущества: выбор трёх, затем AI сразу рисует значки',
       (t) async {
     FlutterSecureStorage.setMockInitialValues({});
     t.view.physicalSize = const Size(1080, 2340);
     t.view.devicePixelRatio = 2.75;
     addTearDown(t.view.reset);
     final s = stateWith3Photos();
-    s.draft.infographic = InfographicText(features: [
-      Feature('bolt', 'Автоматика день-ночь'),
-      Feature('bolt', 'Дистанционная настройка'),
-      Feature('bolt', 'Работа на высоте'),
-    ]);
-    await t.pumpWidget(app(s, const AiIconsScreen()));
-    await t.tap(find.text('Предложить варианты'));
+    s.draft.infographic = InfographicText(); // новый пост: ничего не выбрано
+    s.draft.featureIdeas = [
+      'Автоматика день-ночь',
+      'Дистанционная настройка',
+      'Работа на высоте',
+      'Скрытая проводка',
+    ];
+    await t.pumpWidget(app(s, const FeaturesScreen()));
+    expect(find.text('Выбрано 0 из 3'), findsOneWidget);
+    await t.tap(find.text('Скрытая проводка'));
+    await t.tap(find.text('Автоматика день-ночь'));
+    await t.tap(find.text('Работа на высоте'));
+    await t.pump();
+    expect(find.text('1'), findsOneWidget); // порядок — как нажимали
+    await t.tap(find.text('Далее — значки'));
+    await settle(t);
+    // Экран значков сам отправляет запрос в AI (без ключа — заглушка).
     await t.runAsync(() => Future<void>.delayed(const Duration(seconds: 1)));
     await settle(t);
-    expect(find.text('Вариант 3'), findsWidgets);
-    await t.scrollUntilVisible(find.text('Применить и обновить превью'), 300,
+    expect(find.text('1. Скрытая проводка'), findsOneWidget);
+    expect(find.text('Вариант 3'), findsNWidgets(3));
+    final next = find.widgetWithText(FilledButton, 'Далее — превью');
+    await t.scrollUntilVisible(next, 300,
         scrollable: find.byType(Scrollable).first);
-    expect(find.text('Применить и обновить превью'), findsOneWidget);
+    expect(t.widget<FilledButton>(next).onPressed, isNotNull);
   });
 
   test('Фото скопом: первое — главное, нажатие меняет главное местами', () {
@@ -267,5 +287,8 @@ void main() {
     await t.pump();
     expect(find.text('Плашки на остальные фото через AI'), findsOneWidget);
     expect(find.byIcon(Icons.edit), findsNWidgets(2));
+    await t.scrollUntilVisible(find.text('Другие преимущества и значки'), 300,
+        scrollable: find.byType(Scrollable).first);
+    expect(find.text('Скрытая проводка'), findsOneWidget);
   });
 }

@@ -10,7 +10,7 @@ class FieldSpec {
       {this.hint = '', this.multiline = false});
 }
 
-/// Текстовые поля формы (значки преимуществ — отдельно, см. [kFeatureCount]).
+/// Текстовые поля формы. Преимущества и значки предлагает AI после формы.
 const kInfographicFields = <FieldSpec>[
   FieldSpec('object', 'Название объекта', hint: 'АЗС Magnum'),
   FieldSpec('work', 'Тип работ', hint: 'Подключение стелы'),
@@ -25,10 +25,9 @@ const kInfographicFields = <FieldSpec>[
 const kFeatureCount = 3;
 
 class Feature {
-  String icon; // ключ из kIcons
+  String icon; // ключ встроенного значка — только для старых постов
   String text;
-  List<String>
-      svg; // значок, нарисованный AI (пути 24×24); пусто — берётся icon
+  List<String> svg; // значок, нарисованный AI (пути 24×24)
   Feature(this.icon, this.text, [List<String>? svg]) : svg = svg ?? [];
 
   Map<String, dynamic> toJson() => {'icon': icon, 'text': text, 'svg': svg};
@@ -78,8 +77,9 @@ class InfographicText {
 
 class AiResult {
   final String caption;
-  final InfographicText infographic;
-  AiResult(this.caption, this.infographic);
+  final InfographicText infographic; // без преимуществ — их выбирают отдельно
+  final List<String> featureIdeas; // варианты преимуществ на выбор
+  AiResult(this.caption, this.infographic, this.featureIdeas);
 }
 
 /// Плашка на не главном фото: подпись и точка, к которой она относится
@@ -108,9 +108,9 @@ class PostDraft {
   String? mainPath;
   List<String> otherPaths = [];
   final Map<String, String> fields = {};
-  final List<Feature> features = [
-    for (var i = 0; i < kFeatureCount; i++) Feature('bolt', ''),
-  ];
+
+  /// Варианты преимуществ от AI; выбранные — в [InfographicText.features].
+  List<String> featureIdeas = [];
 
   String caption = '';
   InfographicText infographic = InfographicText();
@@ -148,7 +148,7 @@ class PostDraft {
         'mainPath': mainPath,
         'otherPaths': otherPaths,
         'fields': fields,
-        'features': [for (final f in features) f.toJson()],
+        'featureIdeas': featureIdeas,
         'caption': caption,
         'infographic': infographic.toJson(),
         'saved': saved,
@@ -167,6 +167,9 @@ class PostDraft {
       ..caption = '${j['caption'] ?? ''}'
       ..infographic = InfographicText.fromJson(
           (j['infographic'] as Map?)?.cast<String, dynamic>() ?? {})
+      ..featureIdeas = [
+        for (final f in (j['featureIdeas'] as List? ?? [])) '$f'
+      ]
       ..saved = [for (final b in (j['saved'] as List? ?? [])) b == true]
       ..badges = {
         for (final e in ((j['badges'] as Map?) ?? {}).entries)
@@ -177,10 +180,6 @@ class PostDraft {
       };
     d.fields.addAll(
         ((j['fields'] as Map?) ?? {}).map((k, v) => MapEntry('$k', '$v')));
-    final f = (j['features'] as List? ?? []);
-    for (var i = 0; i < d.features.length && i < f.length; i++) {
-      d.features[i] = Feature.fromJson(f[i] as Map<String, dynamic>);
-    }
     return d;
   }
 }

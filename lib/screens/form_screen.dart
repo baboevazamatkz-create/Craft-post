@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../app_state.dart';
 import '../models/post_draft.dart';
 import '../widgets/busy.dart';
-import 'preview_screen.dart';
+import 'features_screen.dart';
 
 class FormScreen extends StatefulWidget {
   const FormScreen({super.key});
@@ -15,16 +15,11 @@ class FormScreen extends StatefulWidget {
 
 class _FormScreenState extends State<FormScreen> {
   late final Map<String, TextEditingController> _c;
-  late final List<TextEditingController> _feat;
 
   @override
   void initState() {
     super.initState();
-    final draft = context.read<AppState>().draft;
-    final saved = draft.fields;
-    _feat = [
-      for (final f in draft.features) TextEditingController(text: f.text)
-    ];
+    final saved = context.read<AppState>().draft.fields;
     _c = {
       for (final f in kInfographicFields)
         f.key: TextEditingController(text: saved[f.key] ?? ''),
@@ -33,7 +28,7 @@ class _FormScreenState extends State<FormScreen> {
 
   @override
   void dispose() {
-    for (final c in [..._c.values, ..._feat]) {
+    for (final c in _c.values) {
       c.dispose();
     }
     super.dispose();
@@ -44,13 +39,12 @@ class _FormScreenState extends State<FormScreen> {
     s.draft.fields
       ..clear()
       ..addAll({for (final e in _c.entries) e.key: e.value.text.trim()});
-    for (var i = 0; i < _feat.length; i++) {
-      s.draft.features[i].text = _feat[i].text.trim();
-    }
-    final ok = await runBusy(context, 'Готовлю пост…', s.generate);
+    s.draft.infographic.features = [];
+    final ok = await runBusy(
+        context, 'AI пишет текст и преимущества… обычно до минуты', s.generate);
     if (ok && mounted) {
       Navigator.push(
-          context, MaterialPageRoute(builder: (_) => const PreviewScreen()));
+          context, MaterialPageRoute(builder: (_) => const FeaturesScreen()));
     }
   }
 
@@ -72,20 +66,11 @@ class _FormScreenState extends State<FormScreen> {
             ),
             const SizedBox(height: 14),
           ],
-          const Text('Преимущества (значки подберёт программа)',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 10),
-          for (var i = 0; i < _feat.length; i++) ...[
-            TextField(
-              controller: _feat[i],
-              style: const TextStyle(fontSize: 18),
-              decoration: InputDecoration(
-                  labelText: 'Преимущество ${i + 1}',
-                  hintText: 'Автоматика день-ночь'),
-            ),
-            const SizedBox(height: 16),
-          ],
-          const SizedBox(height: 8),
+          const Text(
+              'Преимущества и значки для главного фото AI предложит '
+              'на следующих шагах — останется выбрать.',
+              style: TextStyle(fontSize: 15)),
+          const SizedBox(height: 16),
           FilledButton(onPressed: _create, child: const Text('Создать пост')),
         ],
       ),

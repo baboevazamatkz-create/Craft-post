@@ -7,10 +7,10 @@ import '../app_state.dart';
 import '../models/post_draft.dart';
 import '../theme.dart';
 import '../widgets/busy.dart';
-import '../widgets/icon_dropdown.dart';
 import '../widgets/image_viewer.dart';
-import 'ai_icons_screen.dart';
+import '../widgets/line_icon_view.dart';
 import 'badge_editor_screen.dart';
+import 'features_screen.dart';
 import 'review_screen.dart';
 
 class PreviewScreen extends StatefulWidget {
@@ -27,9 +27,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
       _location,
       _stat,
       _unit;
-  late final List<TextEditingController> _feat;
-  late final List<String> _icons;
-  late final List<List<String>> _svgs;
+  late List<TextEditingController> _feat;
+  late List<List<String>> _svgs;
 
   @override
   void initState() {
@@ -41,9 +40,8 @@ class _PreviewScreenState extends State<PreviewScreen> {
     _location = TextEditingController();
     _stat = TextEditingController();
     _unit = TextEditingController();
-    _feat = [for (final _ in d.infographic.features) TextEditingController()];
-    _icons = List.filled(_feat.length, 'bolt');
-    _svgs = List.filled(_feat.length, const <String>[]);
+    _feat = [];
+    _svgs = [];
     _loadInfographic();
   }
 
@@ -55,12 +53,15 @@ class _PreviewScreenState extends State<PreviewScreen> {
     _location.text = t.location;
     _stat.text = t.stat;
     _unit.text = t.unit;
-    for (var i = 0; i < _feat.length && i < t.features.length; i++) {
-      final f = t.features[i];
-      _feat[i].text = f.text;
-      _icons[i] = f.svg.isNotEmpty ? 'ai' : f.icon;
-      _svgs[i] = f.svg;
-    }
+    // Старые поля ещё на экране до перестройки — освобождаем после кадра.
+    final old = _feat;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final c in old) {
+        c.dispose();
+      }
+    });
+    _feat = [for (final f in t.features) TextEditingController(text: f.text)];
+    _svgs = [for (final f in t.features) f.svg];
   }
 
   Future<void> _suggestBadges() async {
@@ -76,10 +77,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
-  Future<void> _openAiEditor() async {
+  /// Заново выбрать преимущества и значки (AI предложит варианты).
+  Future<void> _changeFeatures() async {
     _apply();
-    final changed = await Navigator.push<bool>(
-        context, MaterialPageRoute(builder: (_) => const AiIconsScreen()));
+    final changed = await Navigator.push<bool>(context,
+        MaterialPageRoute(builder: (_) => const FeaturesScreen(editing: true)));
     if (changed == true && mounted) setState(_loadInfographic);
   }
 
@@ -111,9 +113,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       ..unit = _unit.text
       ..features = [
         for (var i = 0; i < _feat.length; i++)
-          _icons[i] == 'ai'
-              ? Feature('bolt', _feat[i].text, _svgs[i])
-              : Feature(_icons[i], _feat[i].text),
+          Feature(d.infographic.features[i].icon, _feat[i].text, _svgs[i]),
       ];
   }
 
@@ -139,7 +139,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     final d = s.draft;
     final all = d.previews;
     return Scaffold(
-      appBar: AppBar(title: const Text('3. Превью и правки')),
+      appBar: AppBar(title: const Text('5. Превью и правки')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -177,12 +177,6 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   style: TextStyle(fontSize: 13)),
             ),
           ],
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _openAiEditor,
-            icon: const Icon(Icons.auto_awesome),
-            label: const Text('Улучшить значки через AI'),
-          ),
           const SizedBox(height: 16),
           const Text('Инфографика',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
@@ -195,18 +189,23 @@ class _PreviewScreenState extends State<PreviewScreen> {
             const SizedBox(width: 8),
             Expanded(child: _field(_unit, 'Единица')),
           ]),
-          for (var i = 0; i < _feat.length; i++) ...[
-            _field(_feat[i], 'Преимущество ${i + 1}'),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: IconDropdown(
-                  key: ValueKey(
-                      'icon_${i}_${_icons[i]}_${identityHashCode(_svgs[i])}'),
-                  value: _icons[i],
-                  hasAi: _svgs[i].isNotEmpty,
-                  onChanged: (v) => _icons[i] = v),
-            ),
-          ],
+          for (var i = 0; i < _feat.length; i++)
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                margin: const EdgeInsets.only(right: 10, top: 2),
+                decoration: BoxDecoration(
+                    color: const Color(0xFF1B2630),
+                    borderRadius: BorderRadius.circular(10)),
+                child: LineIconView(_svgs[i], size: 52),
+              ),
+              Expanded(child: _field(_feat[i], 'Преимущество ${i + 1}')),
+            ]),
+          OutlinedButton.icon(
+            onPressed: _changeFeatures,
+            icon: const Icon(Icons.auto_awesome),
+            label: const Text('Другие преимущества и значки'),
+          ),
+          const SizedBox(height: 10),
           OutlinedButton.icon(
             onPressed: _refresh,
             icon: const Icon(Icons.refresh),
