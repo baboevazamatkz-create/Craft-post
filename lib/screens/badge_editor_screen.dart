@@ -190,7 +190,8 @@ class _BadgesPainter extends CustomPainter {
   _BadgesPainter(this.painter, this.badges);
 
   @override
-  void paint(Canvas canvas, Size size) => painter.paint(canvas, size, badges);
+  void paint(Canvas canvas, Size size) =>
+      painter.paint(canvas, size, badges, minStroke: 0.7);
 
   @override
   bool shouldRepaint(_BadgesPainter old) => true;
