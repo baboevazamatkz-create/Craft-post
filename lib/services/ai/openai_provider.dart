@@ -22,7 +22,8 @@ class OpenAiProvider extends ChatAiProvider {
   Future<String> ask({
     required String system,
     required String text,
-    required Uint8List jpeg,
+    required List<Uint8List> images,
+    List<String>? labels,
     String effort = 'medium',
   }) async {
     if (apiKey.isEmpty) throw Exception('Не задан API-ключ (Настройки)');
@@ -40,12 +41,17 @@ class OpenAiProvider extends ChatAiProvider {
               {
                 'role': 'user',
                 'content': [
-                  {
-                    'type': 'image_url',
-                    'image_url': {
-                      'url': 'data:image/jpeg;base64,${base64Encode(jpeg)}'
+                  for (var i = 0; i < images.length; i++) ...[
+                    if (labels != null && i < labels.length)
+                      {'type': 'text', 'text': labels[i]},
+                    {
+                      'type': 'image_url',
+                      'image_url': {
+                        'url':
+                            'data:image/jpeg;base64,${base64Encode(images[i])}'
+                      },
                     },
-                  },
+                  ],
                   {'type': 'text', 'text': text},
                 ],
               }

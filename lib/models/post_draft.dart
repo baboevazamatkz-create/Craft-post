@@ -82,6 +82,23 @@ class AiResult {
   AiResult(this.caption, this.infographic);
 }
 
+/// Плашка на не главном фото: подпись и точка, к которой она относится
+/// (доли ширины и высоты кадра, от левого верхнего угла).
+class PhotoBadge {
+  String text;
+  double x, y;
+  PhotoBadge(this.text, this.x, this.y);
+
+  PhotoBadge copy() => PhotoBadge(text, x, y);
+
+  Map<String, dynamic> toJson() => {'text': text, 'x': x, 'y': y};
+  factory PhotoBadge.fromJson(Map<String, dynamic> j) => PhotoBadge(
+        '${j['text'] ?? ''}',
+        ((j['x'] as num?) ?? 0.5).toDouble().clamp(0.0, 1.0),
+        ((j['y'] as num?) ?? 0.5).toDouble().clamp(0.0, 1.0),
+      );
+}
+
 /// Пост целиком. Картинки нумеруются так: 0 — главное фото, 1..n — остальные.
 class PostDraft {
   PostDraft();
@@ -100,6 +117,19 @@ class PostDraft {
 
   /// Какие картинки уже сохранены в галерею (по индексу).
   List<bool> saved = [];
+
+  /// Плашки на не главных фото: ссылка на фото → плашки.
+  Map<String, List<PhotoBadge>> badges = {};
+
+  List<PhotoBadge> badgesOf(String path) => badges[path] ?? const [];
+
+  /// Фото переехали (копии в истории): переносим плашки на новые ссылки.
+  void remapPhotos(Map<String, String> moved) {
+    if (moved.isEmpty) return;
+    badges = {
+      for (final e in badges.entries) (moved[e.key] ?? e.key): e.value,
+    };
+  }
 
   // Превью в пониженном разрешении (JPEG-байты).
   Uint8List? mainPreview;
@@ -122,6 +152,10 @@ class PostDraft {
         'caption': caption,
         'infographic': infographic.toJson(),
         'saved': saved,
+        'badges': {
+          for (final e in badges.entries)
+            e.key: [for (final b in e.value) b.toJson()],
+        },
       };
 
   factory PostDraft.fromJson(Map<String, dynamic> j) {
@@ -133,7 +167,14 @@ class PostDraft {
       ..caption = '${j['caption'] ?? ''}'
       ..infographic = InfographicText.fromJson(
           (j['infographic'] as Map?)?.cast<String, dynamic>() ?? {})
-      ..saved = [for (final b in (j['saved'] as List? ?? [])) b == true];
+      ..saved = [for (final b in (j['saved'] as List? ?? [])) b == true]
+      ..badges = {
+        for (final e in ((j['badges'] as Map?) ?? {}).entries)
+          '${e.key}': [
+            for (final b in (e.value as List? ?? []))
+              PhotoBadge.fromJson((b as Map).cast<String, dynamic>())
+          ],
+      };
     d.fields.addAll(
         ((j['fields'] as Map?) ?? {}).map((k, v) => MapEntry('$k', '$v')));
     final f = (j['features'] as List? ?? []);

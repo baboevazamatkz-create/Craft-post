@@ -25,6 +25,15 @@ abstract class AiProvider {
     required InfographicText current,
     required String instruction,
   });
+
+  /// Плашки на не главные фото: AI видит главное фото (для понимания
+  /// объекта) и все остальные, на каждом отмечает 1–3 детали работы.
+  /// Возвращает список плашек для каждого из [otherJpegs] по порядку.
+  Future<List<List<PhotoBadge>>> suggestBadges({
+    required Uint8List mainJpeg,
+    required List<Uint8List> otherJpegs,
+    required String context,
+  });
 }
 
 /// Сколько вариантов значка просить для каждого преимущества.
@@ -104,11 +113,13 @@ Map<String, dynamic> _jsonObject(String raw) {
 
 /// Общая часть провайдеров-чатов: каждый реализует только [ask].
 abstract class ChatAiProvider implements AiProvider {
-  /// Один запрос: системная инструкция, текст и одно изображение JPEG.
+  /// Один запрос: системная инструкция, изображения JPEG (каждое — со своей
+  /// подписью в [labels], если задана) и текст после них.
   Future<String> ask({
     required String system,
     required String text,
-    required Uint8List jpeg,
+    required List<Uint8List> images,
+    List<String>? labels,
     String effort = 'medium',
   });
 
@@ -121,7 +132,7 @@ abstract class ChatAiProvider implements AiProvider {
       parseAiJson(await ask(
           system: kSystemPrompt,
           text: fieldsToText(fields, features),
-          jpeg: mainPhotoJpeg));
+          images: [mainPhotoJpeg]));
 
   @override
   Future<IconIdeas> suggestIcons({
@@ -133,9 +144,27 @@ abstract class ChatAiProvider implements AiProvider {
           await ask(
               system: kIconSystemPrompt,
               text: iconRequestText(current, instruction),
-              jpeg: mainPreviewJpeg,
+              images: [mainPreviewJpeg],
               effort: 'high'),
           current);
+
+  @override
+  Future<List<List<PhotoBadge>>> suggestBadges({
+    required Uint8List mainJpeg,
+    required List<Uint8List> otherJpegs,
+    required String context,
+  }) async =>
+      parseBadgeJson(
+          await ask(
+            system: kBadgeSystemPrompt,
+            text: '$context\n\nОтметь детали на фото 1–${otherJpegs.length}.',
+            images: [mainJpeg, ...otherJpegs],
+            labels: [
+              'Главное фото — только для понимания объекта, его не размечай',
+              for (var i = 0; i < otherJpegs.length; i++) 'Фото ${i + 1}',
+            ],
+          ),
+          otherJpegs.length);
 }
 
 final kSystemPrompt =
@@ -206,4 +235,40 @@ List<String> sanitizeSvgPaths(Object? raw) {
       .where((d) => d.isNotEmpty && d.length < 1500 && ok.hasMatch(d))
       .take(16)
       .toList();
+}
+
+const kBadgeSystemPrompt =
+    'Ты помогаешь компании CRAFT SYSTEM (электромонтаж) оформлять фото работ '
+    'для Instagram. Тебе дают главное фото объекта (только для понимания) и '
+    'пронумерованные фото работ. На каждом фото работ найди 1–3 детали, '
+    'которые показывают качество монтажа, и подпиши каждую короткой плашкой: '
+    '2–4 слова, по-русски, профессионально и конкретно к тому, что видно '
+    '(например: «Ровная укладка кабеля», «Укладка под лазер», «Плотное '
+    'прилегание», «Маркировка линий», «Крепление каждые 30 см», «Надёжная '
+    'опрессовка»). Не повторяй одну и ту же подпись на разных фото без '
+    'нужды и не выдумывай того, чего не видно. Для каждой плашки укажи '
+    'точку на фото, где находится эта деталь: x и y — доли ширины и высоты '
+    'от левого верхнего угла (0..1). Левый верхний угол кадра занят '
+    'логотипом. Если на фото нечего отметить — верни пустой список. '
+    'Ответ строго JSON без пояснений: {"photos": [{"photo": 1, '
+    '"badges": [{"text": "...", "x": 0.5, "y": 0.5}]}]}';
+
+/// Разбирает плашки по фото; лишнее и испорченное отбрасывает.
+List<List<PhotoBadge>> parseBadgeJson(String raw, int count) {
+  final m = _jsonObject(raw);
+  final out = List.generate(count, (_) => <PhotoBadge>[]);
+  for (final e in (m['photos'] as List? ?? [])) {
+    if (e is! Map) continue;
+    final n = (e['photo'] as num?)?.toInt() ?? 0;
+    if (n < 1 || n > count) continue;
+    for (final b in (e['badges'] as List? ?? [])) {
+      if (b is! Map) continue;
+      final badge = PhotoBadge.fromJson(b.cast<String, dynamic>());
+      badge.text = badge.text.trim();
+      if (badge.text.isEmpty || out[n - 1].length >= 3) continue;
+      if (badge.text.length > 40) badge.text = badge.text.substring(0, 40);
+      out[n - 1].add(badge);
+    }
+  }
+  return out;
 }

@@ -5,10 +5,12 @@ import 'package:provider/provider.dart';
 
 import '../app_state.dart';
 import '../models/post_draft.dart';
+import '../theme.dart';
 import '../widgets/busy.dart';
 import '../widgets/icon_dropdown.dart';
 import '../widgets/image_viewer.dart';
 import 'ai_icons_screen.dart';
+import 'badge_editor_screen.dart';
 import 'review_screen.dart';
 
 class PreviewScreen extends StatefulWidget {
@@ -58,6 +60,19 @@ class _PreviewScreenState extends State<PreviewScreen> {
       _feat[i].text = f.text;
       _icons[i] = f.svg.isNotEmpty ? 'ai' : f.icon;
       _svgs[i] = f.svg;
+    }
+  }
+
+  Future<void> _suggestBadges() async {
+    final s = context.read<AppState>();
+    var count = 0;
+    final ok = await runBusy(context, 'AI смотрит фото… обычно до минуты',
+        () async => count = await s.suggestBadges());
+    if (ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(count == 0
+              ? 'AI не нашёл, что отметить'
+              : 'Плашек: $count. Нажмите ✎ на фото, чтобы поправить')));
     }
   }
 
@@ -147,6 +162,21 @@ class _PreviewScreenState extends State<PreviewScreen> {
             child: Text('Нажмите на фото, чтобы открыть и увеличить',
                 style: TextStyle(fontSize: 13)),
           ),
+          if (d.otherPaths.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _suggestBadges,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Плашки на остальные фото через AI'),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                  'В AI уйдут все фото поста. Значок ✎ на фото — '
+                  'поправить плашки вручную.',
+                  style: TextStyle(fontSize: 13)),
+            ),
+          ],
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: _openAiEditor,
@@ -226,6 +256,26 @@ class _PreviewScreenState extends State<PreviewScreen> {
                 child: const Icon(Icons.zoom_in, color: Colors.white, size: 20),
               ),
             ),
+            if (i > 0)
+              Positioned(
+                left: 6,
+                bottom: 6,
+                child: GestureDetector(
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => BadgeEditorScreen(
+                              path: s.draft.otherPaths[i - 1]))),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                        color: Brand.blue,
+                        borderRadius: BorderRadius.circular(8)),
+                    child:
+                        const Icon(Icons.edit, color: Colors.white, size: 20),
+                  ),
+                ),
+              ),
             if (i < s.saveStates.length && s.saveStates[i] == SaveState.saved)
               const Positioned(
                 left: 6,

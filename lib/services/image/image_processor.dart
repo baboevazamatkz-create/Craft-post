@@ -5,12 +5,14 @@ import 'package:flutter/services.dart';
 
 import '../../models/post_draft.dart';
 import '../../platform/platform.dart';
+import 'badges.dart';
 import 'template.dart';
 
 /// Вся обработка фото на устройстве. `maxSide == null` — полное разрешение.
 class ImageProcessor {
   final InfographicTemplate template;
   final LogoPlacement logoPlacement;
+  final badgePainter = BadgePainter();
   final _assets = <String, ui.Image>{};
 
   /// Чтение исходного фото по ссылке (файл, blob-URL, ключ истории).
@@ -103,12 +105,16 @@ class ImageProcessor {
 
   /// Остальные фото с логотипом.
   Future<Uint8List> renderOther(String path,
-      {int? maxSide, int quality = 92}) async {
+      {List<PhotoBadge> badges = const [],
+      int? maxSide,
+      int quality = 92,
+      bool withBadges = true}) async {
     final logo = await _loadLogo();
     final shade = await _asset('assets/overlays/other_shade.png');
     final image = await _draw(path, maxSide, (c, s) async {
       _drawShade(c, s, shade);
       _drawLogo(c, s, logo);
+      if (withBadges && badges.isNotEmpty) badgePainter.paint(c, s, badges);
     });
     return _toJpeg(image, quality);
   }
@@ -163,8 +169,8 @@ class ImageProcessor {
   }
 
   /// Маленький JPEG без наложений — для отправки в AI.
-  Future<Uint8List> aiPhoto(String path) async {
-    final image = await _draw(path, 1024, (c, s) async {});
+  Future<Uint8List> aiPhoto(String path, {int maxSide = 1024}) async {
+    final image = await _draw(path, maxSide, (c, s) async {});
     return _toJpeg(image, 80);
   }
 }

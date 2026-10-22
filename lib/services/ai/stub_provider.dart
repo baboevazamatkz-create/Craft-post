@@ -71,4 +71,33 @@ class StubAiProvider implements AiProvider {
         }()),
     ]);
   }
+
+  /// Без AI: по одной плашке на фото из пунктов «Что сделано» (или общие
+  /// фразы), в центре кадра — дальше их можно передвинуть руками.
+  @override
+  Future<List<List<PhotoBadge>>> suggestBadges({
+    required Uint8List mainJpeg,
+    required List<Uint8List> otherJpegs,
+    required String context,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    final done = RegExp(r'Что сделано[^:]*:\s*([\s\S]*?)(?:\n[А-ЯЁ][^:\n]*:|$)')
+        .firstMatch(context)
+        ?.group(1)
+        ?.split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+    final phrases = (done == null || done.isEmpty)
+        ? const [
+            'Аккуратный монтаж',
+            'Ровная укладка кабеля',
+            'Надёжное крепление'
+          ]
+        : done;
+    return [
+      for (var i = 0; i < otherJpegs.length; i++)
+        [PhotoBadge(phrases[i % phrases.length], 0.5, 0.55)],
+    ];
+  }
 }

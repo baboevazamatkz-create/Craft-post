@@ -19,14 +19,30 @@ class AnthropicProvider extends ChatAiProvider {
   Future<String> ask({
     required String system,
     required String text,
-    required Uint8List jpeg,
+    required List<Uint8List> images,
+    List<String>? labels,
     String effort = 'medium',
   }) async {
     if (apiKey.isEmpty) throw Exception('Не задан API-ключ (Настройки)');
-    var body = await _post(system, text, jpeg, effort);
+    final content = [
+      for (var i = 0; i < images.length; i++) ...[
+        if (labels != null && i < labels.length)
+          {'type': 'text', 'text': labels[i]},
+        {
+          'type': 'image',
+          'source': {
+            'type': 'base64',
+            'media_type': 'image/jpeg',
+            'data': base64Encode(images[i]),
+          },
+        },
+      ],
+      {'type': 'text', 'text': text},
+    ];
+    var body = await _post(system, content, effort);
     // Если рассуждения не уместились в лимит — повторяем с меньшим усилием.
     if (body['stop_reason'] == 'max_tokens' && effort != 'low') {
-      body = await _post(system, text, jpeg, 'low');
+      body = await _post(system, content, 'low');
     }
     if (body['stop_reason'] == 'refusal') {
       throw Exception('AI отказался обработать это фото. Попробуйте другое.');
@@ -41,7 +57,7 @@ class AnthropicProvider extends ChatAiProvider {
   }
 
   Future<Map<String, dynamic>> _post(
-      String system, String text, Uint8List jpeg, String effort) async {
+      String system, List<Map<String, Object>> content, String effort) async {
     final resp = await http
         .post(
           Uri.parse('https://api.anthropic.com/v1/messages'),
@@ -63,20 +79,7 @@ class AnthropicProvider extends ChatAiProvider {
             'fallbacks': 'default',
             'system': system,
             'messages': [
-              {
-                'role': 'user',
-                'content': [
-                  {
-                    'type': 'image',
-                    'source': {
-                      'type': 'base64',
-                      'media_type': 'image/jpeg',
-                      'data': base64Encode(jpeg),
-                    },
-                  },
-                  {'type': 'text', 'text': text},
-                ],
-              }
+              {'role': 'user', 'content': content}
             ],
           }),
         )

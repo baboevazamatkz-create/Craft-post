@@ -105,6 +105,54 @@ class AppState extends ChangeNotifier {
         instruction: instruction);
   }
 
+  /// Плашки через AI: в AI уходят ВСЕ фото поста (главное — для понимания
+  /// объекта), плашки ставятся на не главные. Существующие плашки заменяются.
+  Future<int> suggestBadges() async {
+    if (draft.otherPaths.isEmpty) return 0;
+    final ai =
+        createAiProvider(await settings.provider(), await settings.apiKey());
+    final main = await processor.aiPhoto(draft.mainPath!, maxSide: 768);
+    final others = [
+      for (final p in draft.otherPaths) await processor.aiPhoto(p, maxSide: 768)
+    ];
+    final result = await ai.suggestBadges(
+        mainJpeg: main,
+        otherJpegs: others,
+        context: fieldsToText(draft.fields, draft.features));
+    var count = 0;
+    for (var i = 0; i < draft.otherPaths.length; i++) {
+      draft.badges[draft.otherPaths[i]] = result[i];
+      count += result[i].length;
+    }
+    await _rerenderOthers(draft.otherPaths);
+    return count;
+  }
+
+  /// Плашки одного фото поправлены вручную.
+  Future<void> updateBadges(String path, List<PhotoBadge> badges) async {
+    draft.badges[path] = badges;
+    await _rerenderOthers([path]);
+  }
+
+  /// Перерисовывает превью указанных не главных фото; их отметки
+  /// «сохранено» сбрасываются, раз картинка изменилась.
+  Future<void> _rerenderOthers(List<String> paths) async {
+    for (final p in paths) {
+      final i = draft.otherPaths.indexOf(p);
+      if (i < 0 || i >= draft.otherPreviews.length) continue;
+      draft.otherPreviews[i] = await processor.renderOther(p,
+          badges: draft.badgesOf(p), maxSide: kPreviewSide, quality: 75);
+      if (i + 1 < saveStates.length &&
+          (saveStates[i + 1] == SaveState.saved ||
+              saveStates[i + 1] == SaveState.error)) {
+        saveStates[i + 1] = SaveState.none;
+        draft.saved[i + 1] = false;
+      }
+    }
+    await store.save(draft);
+    notifyListeners();
+  }
+
   /// Перерисовывает превью и обновляет пост в истории. Главное фото после
   /// правок текста считается несохранённым.
   Future<void> refreshPreviews() async {
@@ -113,7 +161,8 @@ class AppState extends ChangeNotifier {
         maxSide: kPreviewSide, quality: 75);
     draft.otherPreviews = [
       for (final p in draft.otherPaths)
-        await processor.renderOther(p, maxSide: kPreviewSide, quality: 75),
+        await processor.renderOther(p,
+            badges: draft.badgesOf(p), maxSide: kPreviewSide, quality: 75),
     ];
     _syncStates();
     if (saveStates[0] == SaveState.saved || saveStates[0] == SaveState.error) {
@@ -166,7 +215,8 @@ class AppState extends ChangeNotifier {
       set(SaveState.saving);
       final jpg = i == 0
           ? await processor.renderMain(post.mainPath!, post.infographic)
-          : await processor.renderOther(post.otherPaths[i - 1]);
+          : await processor.renderOther(post.otherPaths[i - 1],
+              badges: post.badgesOf(post.otherPaths[i - 1]));
       await saver.save(jpg, 'craft_${post.id ?? 'post'}_${i + 1}');
       if (i < post.saved.length) post.saved[i] = true;
       await store.save(post, previews: false);

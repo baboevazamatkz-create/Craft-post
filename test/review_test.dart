@@ -5,6 +5,7 @@ import 'package:craft_post/models/post_draft.dart';
 import 'package:craft_post/screens/ai_icons_screen.dart';
 import 'package:craft_post/screens/preview_screen.dart';
 import 'package:craft_post/services/ai/ai_provider.dart';
+import 'package:craft_post/services/image/badges.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:craft_post/screens/review_screen.dart';
 import 'package:craft_post/theme.dart';
@@ -164,5 +165,62 @@ void main() {
 
     s.removePhoto('d');
     expect(s.draft.otherPaths, ['a', 'e']);
+  });
+
+  test('parseBadgeJson: плашки по номерам фото, лишнее отбрасывается', () {
+    final r = parseBadgeJson(
+        '```json\n{"photos":['
+        '{"photo":1,"badges":[{"text":"Ровная укладка кабеля","x":0.4,"y":0.7},'
+        '{"text":"  ","x":0.1,"y":0.1},{"text":"Под лазер","x":2,"y":-1},'
+        '{"text":"Плотное прилегание","x":0.5,"y":0.5},{"text":"Четвёртая","x":0.5,"y":0.5}]},'
+        '{"photo":3,"badges":[{"text":"Чужое фото","x":0.5,"y":0.5}]}]}\n```',
+        2);
+    expect(r.length, 2);
+    expect([for (final b in r[0]) b.text],
+        ['Ровная укладка кабеля', 'Под лазер', 'Плотное прилегание']);
+    expect(r[0][1].x, 1.0); // координаты зажаты в кадр
+    expect(r[0][1].y, 0.0);
+    expect(r[1], isEmpty);
+  });
+
+  test('Плашки сохраняются в JSON и переезжают вместе с фото', () {
+    final d = PostDraft()
+      ..mainPath = 'm'
+      ..otherPaths = ['a', 'b']
+      ..badges = {
+        'a': [PhotoBadge('Ровная укладка кабеля', 0.3, 0.6)]
+      };
+    final back = PostDraft.fromJson(d.toJson());
+    expect(back.badgesOf('a').single.text, 'Ровная укладка кабеля');
+    expect(back.badgesOf('b'), isEmpty);
+    back.remapPhotos({'a': 'idb:1/photo_0', 'b': 'idb:1/photo_1'});
+    expect(back.badgesOf('idb:1/photo_0').single.y, 0.6);
+  });
+
+  test('Раскладка плашек: в кадре, мимо логотипа, без наложений', () {
+    const size = Size(1080, 1440);
+    final boxes = BadgePainter().layout(size, [
+      PhotoBadge('Ровная укладка кабеля', 0.1, 0.05), // под логотипом
+      PhotoBadge('Укладка под лазер', 0.12, 0.08),
+      PhotoBadge('Плотное прилегание', 0.9, 0.98),
+    ]);
+    final frame = Offset.zero & size;
+    for (final b in boxes) {
+      expect(frame.contains(b.plaque.topLeft), isTrue);
+      expect(frame.contains(b.plaque.bottomRight), isTrue);
+      expect(b.plaque.overlaps(BadgePainter.logoZone(size)), isFalse);
+    }
+    expect(boxes[0].plaque.overlaps(boxes[1].plaque), isFalse);
+  });
+
+  testWidgets('Превью: кнопка плашек через AI и правка на каждом фото',
+      (t) async {
+    t.view.physicalSize = const Size(1080, 2340);
+    t.view.devicePixelRatio = 2.75;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(app(stateWith3Photos(), const PreviewScreen()));
+    await t.pump();
+    expect(find.text('Плашки на остальные фото через AI'), findsOneWidget);
+    expect(find.byIcon(Icons.edit), findsNWidgets(2));
   });
 }

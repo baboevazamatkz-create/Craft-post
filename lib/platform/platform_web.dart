@@ -121,8 +121,12 @@ class _IdbPostStore implements PostStore {
       return '$_prefix$key';
     }
 
-    if (d.mainPath != null) d.mainPath = await keep(d.mainPath!, 'main');
-    d.otherPaths = [for (final p in d.otherPaths) await keep(p, 'photo')];
+    final moved = <String, String>{};
+    Future<String> track(String p, String prefix) async =>
+        moved[p] = await keep(p, prefix);
+    if (d.mainPath != null) d.mainPath = await track(d.mainPath!, 'main');
+    d.otherPaths = [for (final p in d.otherPaths) await track(p, 'photo')];
+    d.remapPhotos(moved);
     final used = {d.mainPath, ...d.otherPaths}
         .whereType<String>()
         .map((r) => r.substring(_prefix.length))
