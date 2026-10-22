@@ -250,8 +250,9 @@ void main() {
           expect(segRect(a.point, a.joint, b.plaque), isFalse,
               reason: '${badges[i].text} → ${badges[j].text}');
           expect(b.plaque.contains(a.point), isFalse);
-          if (i < j)
+          if (i < j) {
             expect(segSeg(a.point, a.joint, b.point, b.joint), isFalse);
+          }
         }
       }
     }
