@@ -23,6 +23,20 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      # Постоянная подпись: одна и та же у всех сборок, поэтому новая версия
+      # ставится поверх старой и ключ AI с историей постов сохраняются.
+      - name: Подпись APK из секретов
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::warning::Секреты подписи не заданы: APK подписан временным ключом и не встанет поверх прошлой версии"
+            exit 0
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > android/app/upload.p12
+          printf 'storeFile=upload.p12\nstorePassword=%s\nkeyAlias=craft\nkeyPassword=%s\n' \
+            "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > android/key.properties
       # Загрузка Gradle/NDK иногда обрывается — повторяем до 3 раз.
       - run: |
           for i in 1 2 3; do
@@ -30,6 +44,8 @@ jobs:
             echo "Сборка не удалась (попытка $i), повтор"; sleep 10
           done
           exit 1
+      - name: Отпечаток подписи APK
+        run: keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk | grep -E "Owner|SHA256" || true
       - uses: actions/upload-artifact@v4
         with:
           name: craft-post-apk
