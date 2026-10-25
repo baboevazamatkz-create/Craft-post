@@ -357,4 +357,27 @@ void main() {
     expect(s.hasBadges, isTrue);
     expect(find.text('Убрать все плашки'), findsOneWidget);
   });
+
+  test('Ручная плашка: стрелка, полка и размер — как задали', () {
+    const size = Size(1000, 1300);
+    final auto = BadgePainter().layout(size, [PhotoBadge('Щит', 0.5, 0.5)]);
+    final b =
+        PhotoBadge('Щит', 0.5, 0.5, scale: 1.4, shelf: 0.2, jx: -0.1, jy: 0.08);
+    final box = BadgePainter().layout(size, [b]).single;
+    expect(box.joint.dx, closeTo(500 - 100, 0.01)); // влево на 0,1 ширины
+    expect(box.joint.dy, closeTo(650 + 80, 0.01)); // ниже на 0,08 ширины
+    expect(box.toRight, isFalse);
+    expect(box.plaque.right, closeTo(box.joint.dx, 0.01));
+    expect(box.plaque.top, closeTo(box.joint.dy, 0.01));
+    // Полка длиннее текста на 0,2 ширины, текст у стрелки.
+    expect(box.plaque.width - box.text.width, greaterThan(200));
+    expect(box.textAt.dx + box.text.width, greaterThan(box.plaque.right - 30));
+    // Крупнее автоматической.
+    expect(box.text.height, greaterThan(auto.single.text.height));
+
+    final back = PhotoBadge.fromJson(b.toJson());
+    expect([back.scale, back.shelf, back.jx, back.jy], [1.4, 0.2, -0.1, 0.08]);
+    expect(PhotoBadge.fromJson(PhotoBadge('a', 0.1, 0.2).toJson()).manual,
+        isFalse);
+  });
 }

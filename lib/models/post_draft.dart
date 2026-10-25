@@ -83,20 +83,50 @@ class AiResult {
 }
 
 /// Плашка на не главном фото: подпись и точка, к которой она относится
-/// (доли ширины и высоты кадра, от левого верхнего угла).
+/// (доли ширины и высоты кадра, от левого верхнего угла). Остальное —
+/// ручная настройка в редакторе.
 class PhotoBadge {
   String text;
   double x, y;
-  PhotoBadge(this.text, this.x, this.y);
 
-  PhotoBadge copy() => PhotoBadge(text, x, y);
+  /// Размер подписи (1 — обычный).
+  double scale;
 
-  Map<String, dynamic> toJson() => {'text': text, 'x': x, 'y': y};
-  factory PhotoBadge.fromJson(Map<String, dynamic> j) => PhotoBadge(
-        '${j['text'] ?? ''}',
-        ((j['x'] as num?) ?? 0.5).toDouble().clamp(0.0, 1.0),
-        ((j['y'] as num?) ?? 0.5).toDouble().clamp(0.0, 1.0),
-      );
+  /// Удлинение полки за текстом, доля ширины кадра.
+  double shelf;
+
+  /// Куда ведёт стрелка: конец полки относительно точки, доли ширины кадра.
+  /// null — место выбирается автоматически.
+  double? jx, jy;
+
+  PhotoBadge(this.text, this.x, this.y,
+      {this.scale = 1, this.shelf = 0, this.jx, this.jy});
+
+  bool get manual => jx != null && jy != null;
+
+  PhotoBadge copy() =>
+      PhotoBadge(text, x, y, scale: scale, shelf: shelf, jx: jx, jy: jy);
+
+  Map<String, dynamic> toJson() => {
+        'text': text,
+        'x': x,
+        'y': y,
+        if (scale != 1) 'scale': scale,
+        if (shelf != 0) 'shelf': shelf,
+        if (manual) ...{'jx': jx, 'jy': jy},
+      };
+  factory PhotoBadge.fromJson(Map<String, dynamic> j) {
+    double? d(String k) => (j[k] as num?)?.toDouble();
+    return PhotoBadge(
+      '${j['text'] ?? ''}',
+      (d('x') ?? 0.5).clamp(0.0, 1.0),
+      (d('y') ?? 0.5).clamp(0.0, 1.0),
+      scale: (d('scale') ?? 1).clamp(0.5, 2.0),
+      shelf: (d('shelf') ?? 0).clamp(0.0, 0.5),
+      jx: d('jx'),
+      jy: d('jy'),
+    );
+  }
 }
 
 /// Пост целиком. Картинки нумеруются так: 0 — главное фото, 1..n — остальные.

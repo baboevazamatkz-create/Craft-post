@@ -14,15 +14,22 @@ class BadgeBox {
 
   /// Где выноска встречает полку: ближний к метке конец полки.
   final Offset joint;
-  BadgeBox(this.point, this.plaque, this.text, this.joint);
+
+  /// Где рисуется текст (полка может быть длиннее текста).
+  final Offset textAt;
+  BadgeBox(this.point, this.plaque, this.text, this.joint, this.textAt);
+
+  /// Справа от стрелки полка или слева.
+  bool get toRight => plaque.left >= joint.dx - 0.5;
 }
 
 class _Option {
   final Rect rect;
   final Offset joint;
   final TextPainter text;
+  final Offset textAt;
   final double cost;
-  _Option(this.rect, this.joint, this.text, this.cost);
+  _Option(this.rect, this.joint, this.text, this.textAt, this.cost);
 }
 
 /// Выноски на не главных фото в стиле «линия»: точка на детали, тонкая
@@ -57,7 +64,7 @@ class BadgePainter {
     final points = [for (final b in badges) Offset(b.x * w, b.y * size.height)];
     final options = [
       for (var i = 0; i < badges.length; i++)
-        _options(size, points[i], badges[i].text),
+        _options(size, points[i], badges[i]),
     ];
     final pick = <_Option?>[for (final _ in badges) null];
 
@@ -90,7 +97,8 @@ class BadgePainter {
     }
     return [
       for (var i = 0; i < badges.length; i++)
-        BadgeBox(points[i], pick[i]!.rect, pick[i]!.text, pick[i]!.joint),
+        BadgeBox(points[i], pick[i]!.rect, pick[i]!.text, pick[i]!.joint,
+            pick[i]!.textAt),
     ];
   }
 
@@ -103,8 +111,9 @@ class BadgePainter {
 
   /// Подпись целиком в 2 строки шириной [maxWidth]: длинная — мельче,
   /// без многоточий и переносов по буквам.
-  (TextPainter, TextPainter) _text(double w, String text, double maxWidth) {
-    final key = '$w|$maxWidth|$text';
+  (TextPainter, TextPainter) _text(
+      double w, String text, double maxWidth, double scale) {
+    final key = '$w|$maxWidth|$scale|$text';
     final hit = _texts[key];
     if (hit != null) return hit;
     TextPainter build(String t, double fs, int? lines,
@@ -130,7 +139,7 @@ class BadgePainter {
           maxLines: lines,
         );
     final upper = text.toUpperCase();
-    final left = fitText(upper, w * _font, maxWidth, 2, build);
+    final left = fitText(upper, w * _font * scale, maxWidth, 2, build);
     final fs = (left.text as TextSpan).style!.fontSize!;
     final right = build(upper, fs, left.maxLines, TextAlign.right)
       ..layout(maxWidth: maxWidth);
@@ -138,55 +147,104 @@ class BadgePainter {
     return _texts[key] = (left, right);
   }
 
-  List<_Option> _options(Size size, Offset p, String text) {
+  /// Вариант по стороне полки, концу стрелки [joint] и размеру подписи.
+  _Option _option(int side, bool up, Offset joint, TextPainter tp, double bw,
+      double bh, double padH, double padV, double cost) {
+    final r = Rect.fromLTWH(side > 0 ? joint.dx : joint.dx - bw,
+        up ? joint.dy - bh : joint.dy, bw, bh);
+    // Текст — у стрелки; удлинённая полка уходит дальше от неё.
+    final tx = side > 0 ? r.left + padH : r.right - padH - tp.width;
+    return _Option(r, joint, tp, Offset(tx, r.top + padV), cost);
+  }
+
+  static double _within(double v, double lo, double hi) =>
+      hi < lo ? lo : v.clamp(lo, hi);
+
+  List<_Option> _options(Size size, Offset p, PhotoBadge b) {
     final w = size.width, h = size.height;
-    final margin = w * 0.04, padH = w * _padH, padV = w * _padV;
+    final k = b.scale;
+    final margin = w * 0.04, padH = w * _padH * k, padV = w * _padV * k;
+    final extra = w * b.shelf;
     final frame = Rect.fromLTRB(margin, margin, w - margin, h - margin);
     final logo = logoZone(size).inflate(w * 0.01);
+
+    // Ручная настройка: стрелка туда, куда поставили. Не влезает в кадр —
+    // зеркалим на другую сторону от точки (угол со стрелкой остаётся тупым),
+    // и только если не влезает и там — прижимаем к краю.
+    if (b.manual) {
+      final (l, r) = _text(w, b.text, w * 0.46 * math.max(1.0, k), k);
+      final bw = l.width + 2 * padH + extra, bh = l.height + 2 * padV;
+      var side = b.jx! >= 0 ? 1 : -1;
+      var up = b.jy! < 0;
+      var jx = p.dx + b.jx! * w, jy = p.dy + b.jy! * w;
+      bool fitsX(int sd, double x) =>
+          sd > 0 ? x + bw <= w - margin : x - bw >= margin;
+      bool fitsY(bool u, double y) =>
+          u ? y - bh >= margin : y + bh <= h - margin;
+      if (!fitsX(side, jx) && fitsX(-side, p.dx - b.jx! * w)) {
+        side = -side;
+        jx = p.dx - b.jx! * w;
+      }
+      if (!fitsY(up, jy) && fitsY(!up, p.dy - b.jy! * w)) {
+        up = !up;
+        jy = p.dy - b.jy! * w;
+      }
+      jx = _within(jx, side > 0 ? margin : margin + bw,
+          side > 0 ? w - margin - bw : w - margin);
+      jy = _within(
+          jy, up ? margin + bh : margin, up ? h - margin : h - margin - bh);
+      return [
+        _option(
+            side, up, Offset(jx, jy), side > 0 ? l : r, bw, bh, padH, padV, 0)
+      ];
+    }
+
     final out = <_Option>[];
     final fallback = <_Option>[];
-    for (final (k, maxW) in [(0, 0.46), (1, 0.34)]) {
-      final (leftText, rightText) = _text(w, text, w * maxW);
+    for (final (n, maxW) in [(0, 0.46), (1, 0.34)]) {
+      final (leftText, rightText) =
+          _text(w, b.text, w * maxW * math.max(1.0, k), k);
       final lines = leftText.computeLineMetrics().length;
-      if (k == 1 && lines < 2) continue; // и так в одну строку
+      if (n == 1 && lines < 2) continue; // и так в одну строку
       // Чем сильнее пришлось уменьшить шрифт, тем хуже вариант.
       final shrink =
-          1 - (leftText.text as TextSpan).style!.fontSize! / (w * _font);
+          1 - (leftText.text as TextSpan).style!.fontSize! / (w * _font * k);
       for (final side in [1, -1]) {
         // Справа текст прижат к левому краю, слева — к правому: так он
         // начинается от выноски.
         final tp = side > 0 ? leftText : rightText;
-        final bw = tp.width + 2 * padH, bh = tp.height + 2 * padV;
+        final bw = tp.width + 2 * padH + extra, bh = tp.height + 2 * padV;
         for (final up in [true, false]) {
-          for (var n = 0; n < _reach.length; n++) {
-            final (rise, dx) = _reach[n];
-            final jx = p.dx + side * dx * w;
-            final jy = p.dy + (up ? -rise : rise) * w;
-            final left = side > 0 ? jx : jx - bw;
-            final top = up ? jy - bh : jy;
-            final r = Rect.fromLTWH(left, top, bw, bh);
+          for (final (rise, dx) in _reach) {
+            final joint =
+                Offset(p.dx + side * dx * w, p.dy + (up ? -rise : rise) * w);
             // Стоимость в долях ширины: ближе — лучше; над меткой и в одну
             // строку — чуть лучше; к центру кадра — чуть лучше.
-            var cost = rise * 100 +
+            final cost = rise * 100 +
                 dx * 25 +
                 (up ? 0 : 3) +
-                (k == 1 ? 4 : 0) +
+                (n == 1 ? 4 : 0) +
                 shrink * 60 +
                 (lines > 2 ? 40 : 0) +
                 ((side > 0) == (p.dx < w / 2) ? 0 : 2);
-            final o = _Option(r, Offset(jx, jy), tp, cost);
-            final inside = frame.contains(r.topLeft) &&
+            final o = _option(side, up, joint, tp, bw, bh, padH, padV, cost);
+            final r = o.rect;
+            if (frame.contains(r.topLeft) &&
                 frame.contains(r.bottomRight) &&
-                !r.overlaps(logo);
-            if (inside) {
+                !r.overlaps(logo)) {
               out.add(o);
             } else {
               final moved = _clamp(r, frame);
-              fallback.add(_Option(
-                  moved,
+              fallback.add(_option(
+                  side,
+                  up,
                   Offset(side > 0 ? moved.left : moved.right,
                       up ? moved.bottom : moved.top),
                   tp,
+                  bw,
+                  bh,
+                  padH,
+                  padV,
                   cost + 1000));
             }
           }
@@ -276,14 +334,22 @@ class BadgePainter {
       canvas.drawLine(a, b, line);
     }
 
+    // Тень — только под текстом, не под удлинённой полкой.
     for (final b in laid) {
-      canvas.drawRect(b.plaque.inflate(w * 0.009), smoke);
+      final padH = b.toRight
+          ? b.textAt.dx - b.plaque.left
+          : b.plaque.right - b.textAt.dx - b.text.width;
+      canvas.drawRect(
+          Rect.fromLTWH(b.textAt.dx - padH, b.plaque.top,
+                  b.text.width + 2 * padH, b.plaque.height)
+              .inflate(w * 0.009),
+          smoke);
     }
     for (final b in laid) {
       final r = b.plaque;
       stroke(b.point, b.joint);
       stroke(Offset(r.left, b.joint.dy), Offset(r.right, b.joint.dy));
-      b.text.paint(canvas, Offset(r.left + w * _padH, r.top + w * _padV));
+      b.text.paint(canvas, b.textAt);
       canvas.drawCircle(
           b.point, dotR + lw, Paint()..color = const Color(0x59000000));
       canvas.drawCircle(b.point, dotR, Paint()..color = _white);
