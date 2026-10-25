@@ -173,6 +173,27 @@ class AppState extends ChangeNotifier {
     return count;
   }
 
+  bool get hasBadges => draft.badges.values.any((l) => l.isNotEmpty);
+
+  /// Убирает плашки со всех фото разом; возвращает прежние — для «Вернуть».
+  Future<Map<String, List<PhotoBadge>>> clearBadges() async {
+    final before = draft.badges;
+    draft.badges = {};
+    await _rerenderOthers([
+      for (final e in before.entries)
+        if (e.value.isNotEmpty) e.key
+    ]);
+    return before;
+  }
+
+  Future<void> restoreBadges(Map<String, List<PhotoBadge>> before) async {
+    draft.badges = before;
+    await _rerenderOthers([
+      for (final e in before.entries)
+        if (e.value.isNotEmpty) e.key
+    ]);
+  }
+
   /// Плашки одного фото поправлены вручную.
   Future<void> updateBadges(String path, List<PhotoBadge> badges) async {
     draft.badges[path] = badges;

@@ -313,6 +313,7 @@ void main() {
     await t.pump();
     expect(find.text('Плашки на остальные фото через AI'), findsOneWidget);
     expect(find.byIcon(Icons.edit), findsNWidgets(2));
+    expect(find.text('Убрать все плашки'), findsNothing); // плашек ещё нет
     await t.scrollUntilVisible(find.text('Другие преимущества и значки'), 300,
         scrollable: find.byType(Scrollable).first);
     expect(find.text('Скрытая проводка'), findsOneWidget);
@@ -339,5 +340,21 @@ void main() {
     expect(() => ai.drawIcons(features: ['Свет'], instruction: ''),
         throwsA(predicate((e) => '$e'.contains('Не введён API-ключ'))));
     expect(createAiProvider('stub', 'k'), isNot(isA<StubAiProvider>()));
+  });
+
+  testWidgets('Превью: есть плашки — есть кнопка «Убрать все плашки»',
+      (t) async {
+    t.view.physicalSize = const Size(1080, 2340);
+    t.view.devicePixelRatio = 2.75;
+    addTearDown(t.view.reset);
+    final s = stateWith3Photos();
+    s.draft.badges = {
+      '/x/1.jpg': [PhotoBadge('Ровная укладка', 0.5, 0.5)],
+      '/x/2.jpg': [PhotoBadge('Запас кабеля', 0.4, 0.6)],
+    };
+    await t.pumpWidget(app(s, const PreviewScreen()));
+    await t.pump();
+    expect(s.hasBadges, isTrue);
+    expect(find.text('Убрать все плашки'), findsOneWidget);
   });
 }

@@ -77,6 +77,23 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
+  Future<void> _clearBadges() async {
+    final s = context.read<AppState>();
+    Map<String, List<PhotoBadge>>? before;
+    final ok = await runBusy(
+        context, 'Убираю плашки…', () async => before = await s.clearBadges());
+    if (!ok || !mounted || before == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text('Все плашки убраны'),
+      duration: const Duration(seconds: 6),
+      action: SnackBarAction(
+        label: 'Вернуть',
+        onPressed: () =>
+            runBusy(context, 'Возвращаю…', () => s.restoreBadges(before!)),
+      ),
+    ));
+  }
+
   /// Заново выбрать преимущества и значки (AI предложит варианты).
   Future<void> _changeFeatures() async {
     _apply();
@@ -169,6 +186,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
               icon: const Icon(Icons.auto_awesome),
               label: const Text('Плашки на остальные фото через AI'),
             ),
+            if (s.hasBadges) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _clearBadges,
+                icon: const Icon(Icons.layers_clear_outlined),
+                label: const Text('Убрать все плашки'),
+              ),
+            ],
             const Padding(
               padding: EdgeInsets.only(top: 4),
               child: Text(
