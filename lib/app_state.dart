@@ -76,7 +76,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Подмена AI в тестах (заглушка без сети).
+  @visibleForTesting
+  AiProvider? aiOverride;
+
   Future<AiProvider> _ai() async =>
+      aiOverride ??
       createAiProvider(await settings.provider(), await settings.apiKey());
 
   /// Шаг «Создать»: AI (главное фото + поля) пишет подпись, тексты

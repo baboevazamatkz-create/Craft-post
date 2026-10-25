@@ -24,7 +24,9 @@ Future<bool> runBusy(
     await task();
     return true;
   } catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+    final text = '$e'.replaceFirst(RegExp(r'^Exception: '), '');
+    messenger.showSnackBar(SnackBar(
+        content: Text('Ошибка: $text'), duration: const Duration(seconds: 6)));
     return false;
   } finally {
     nav.pop();

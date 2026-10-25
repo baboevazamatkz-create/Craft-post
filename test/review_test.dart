@@ -5,6 +5,8 @@ import 'package:craft_post/models/post_draft.dart';
 import 'package:craft_post/screens/features_screen.dart';
 import 'package:craft_post/screens/preview_screen.dart';
 import 'package:craft_post/services/ai/ai_provider.dart';
+import 'package:craft_post/services/ai/ai_factory.dart';
+import 'package:craft_post/services/ai/stub_provider.dart';
 import 'package:craft_post/services/image/badges.dart';
 import 'package:craft_post/services/image/fit_text.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -139,7 +141,7 @@ void main() {
     t.view.physicalSize = const Size(1080, 2340);
     t.view.devicePixelRatio = 2.75;
     addTearDown(t.view.reset);
-    final s = stateWith3Photos();
+    final s = stateWith3Photos()..aiOverride = StubAiProvider();
     s.draft.infographic = InfographicText(); // новый пост: ничего не выбрано
     s.draft.featureIdeas = [
       'Автоматика день-ночь',
@@ -307,5 +309,12 @@ void main() {
     expect(long.didExceedMaxLines, isFalse);
     expect(long.computeLineMetrics().length, lessThanOrEqualTo(2));
     expect(long.width, lessThanOrEqualTo(200.5)); // слово не режется
+  });
+
+  test('Без ключа — понятная ошибка, а не случайные значки', () async {
+    final ai = createAiProvider('anthropic', '');
+    expect(() => ai.suggestIcons(features: ['Свет'], instruction: ''),
+        throwsA(predicate((e) => '$e'.contains('Не введён API-ключ'))));
+    expect(createAiProvider('stub', 'k'), isNot(isA<StubAiProvider>()));
   });
 }

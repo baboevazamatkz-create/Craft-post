@@ -26,7 +26,10 @@ class OpenAiProvider extends ChatAiProvider {
     List<String>? labels,
     String effort = 'medium',
   }) async {
-    if (apiKey.isEmpty) throw Exception('Не задан API-ключ (Настройки)');
+    if (apiKey.trim().isEmpty) {
+      throw Exception(
+          'Не введён API-ключ. Откройте ⚙ Настройки и вставьте ключ.');
+    }
     final resp = await http
         .post(
           Uri.parse('$baseUrl/chat/completions'),

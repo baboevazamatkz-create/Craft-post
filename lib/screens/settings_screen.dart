@@ -22,7 +22,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final st = context.read<AppState>().settings;
     () async {
       _key.text = await st.apiKey();
-      _provider = await st.provider();
+      final p = await st.provider();
+      _provider = kProviderIds.containsKey(p) ? p : 'anthropic';
       if (mounted) setState(() => _loaded = true);
     }();
   }
