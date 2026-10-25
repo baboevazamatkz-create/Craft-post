@@ -1,15 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../app_state.dart';
 import '../models/post_draft.dart';
 import '../theme.dart';
-import '../widgets/busy.dart';
 import '../widgets/line_icon_view.dart';
 import 'preview_screen.dart';
 
-/// Значки к выбранным преимуществам: AI рисует варианты сразу при
-/// открытии экрана, пользователь выбирает по одному на каждое.
+/// Вариант значка: из библиотеки (с именем), нарисованный AI или текущий.
+class _Variant {
+  final List<String> paths;
+  final String label;
+  final String? name;
+  _Variant(this.paths, this.label, [this.name]);
+}
+
+/// Значки к выбранным преимуществам. При открытии сразу идут два запроса:
+/// подбор из библиотеки (секунды) и рисунок AI (дольше, появляется фоном).
+/// Выбрать можно, не дожидаясь рисунка.
 class IconsScreen extends StatefulWidget {
   final List<Feature> features;
 
@@ -23,9 +33,10 @@ class IconsScreen extends StatefulWidget {
 
 class _IconsScreenState extends State<IconsScreen> {
   final _wish = TextEditingController();
-  late final List<List<List<String>>> _variants;
+  late final List<List<_Variant>> _variants;
   late final List<int> _pick; // -1 — ещё не выбран
-  late final List<bool> _hasCurrent;
+  final _shown = <String>{}; // имена из библиотеки, уже показанные
+  bool _picking = false, _drawing = false, _saving = false;
 
   static const _quick = [
     'Интереснее и детальнее',
@@ -36,12 +47,11 @@ class _IconsScreenState extends State<IconsScreen> {
   @override
   void initState() {
     super.initState();
-    final f = widget.features;
-    _hasCurrent = [for (final x in f) x.svg.isNotEmpty];
     _variants = [
-      for (final x in f) [if (x.svg.isNotEmpty) x.svg]
+      for (final f in widget.features)
+        [if (f.svg.isNotEmpty) _Variant(f.svg, 'Сейчас')]
     ];
-    _pick = [for (final x in f) x.svg.isNotEmpty ? 0 : -1];
+    _pick = [for (final f in widget.features) f.svg.isNotEmpty ? 0 : -1];
     WidgetsBinding.instance.addPostFrameCallback((_) => _suggest());
   }
 
@@ -51,33 +61,76 @@ class _IconsScreenState extends State<IconsScreen> {
     super.dispose();
   }
 
+  List<String> get _texts => [for (final f in widget.features) f.text];
+
+  void _error(Object e) {
+    if (!mounted) return;
+    final text = '$e'.replaceFirst(RegExp(r'^Exception: '), '');
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Ошибка: $text'), duration: const Duration(seconds: 6)));
+  }
+
+  /// Добавляет варианты; невыбранное преимущество получает первый новый.
+  void _add(int i, List<_Variant> fresh) {
+    if (fresh.isEmpty) return;
+    final first = _variants[i].length;
+    _variants[i].addAll(fresh);
+    if (_pick[i] < 0) _pick[i] = first;
+  }
+
   Future<void> _suggest() async {
+    if (_picking || _drawing) return;
     final s = context.read<AppState>();
-    List<List<List<String>>>? res;
-    final ok = await runBusy(
-        context,
-        'AI рисует значки… обычно до минуты',
-        () async => res = await s.suggestIcons(
-            [for (final f in widget.features) f.text], _wish.text));
-    if (!ok || res == null || !mounted) return;
-    setState(() {
-      for (var i = 0; i < _variants.length && i < res!.length; i++) {
-        final first = _variants[i].length;
-        _variants[i].addAll(res![i]);
-        if (_pick[i] < 0 && res![i].isNotEmpty) _pick[i] = first;
-      }
-    });
+    final texts = _texts, wish = _wish.text;
+    setState(() => _picking = _drawing = true);
+
+    // Рисунок AI — фоном, не задерживает выбор.
+    unawaited(s.drawIcons(texts, wish).then((res) {
+      if (!mounted) return;
+      setState(() {
+        for (var i = 0; i < _variants.length && i < res.length; i++) {
+          _add(i, [for (final p in res[i]) _Variant(p, 'Рисунок AI')]);
+        }
+      });
+    }, onError: _error).whenComplete(() {
+      if (mounted) setState(() => _drawing = false);
+    }));
+
+    try {
+      final res = await s.pickIcons(texts, wish, {..._shown});
+      if (!mounted) return;
+      setState(() {
+        for (var i = 0; i < _variants.length && i < res.length; i++) {
+          _add(i, [
+            for (final (name, paths) in res[i])
+              _Variant(paths, 'Вариант', name),
+          ]);
+          _shown.addAll([for (final (name, _) in res[i]) name]);
+        }
+      });
+    } catch (e) {
+      _error(e);
+    } finally {
+      if (mounted) setState(() => _picking = false);
+    }
   }
 
   Future<void> _done() async {
     final s = context.read<AppState>();
     final features = [
       for (var i = 0; i < widget.features.length; i++)
-        Feature('bolt', widget.features[i].text, _variants[i][_pick[i]]),
+        Feature('bolt', widget.features[i].text, _variants[i][_pick[i]].paths),
     ];
-    final ok = await runBusy(
-        context, 'Готовлю превью…', () => s.setFeatures(features));
-    if (!ok || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await s.setFeatures(features);
+    } catch (e) {
+      _error(e);
+      return;
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+    if (!mounted) return;
     if (widget.editing) {
       Navigator.pop(context, true);
     } else {
@@ -88,12 +141,23 @@ class _IconsScreenState extends State<IconsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ready = !_pick.contains(-1);
+    final ready = !_pick.contains(-1) && !_saving;
+    final busy = _picking || _drawing;
     return Scaffold(
       appBar: AppBar(title: const Text('4. Значки')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (busy) ...[
+            const LinearProgressIndicator(),
+            const SizedBox(height: 6),
+            Text(
+                _picking
+                    ? 'AI подбирает значки…'
+                    : 'AI рисует свой вариант — можно не ждать',
+                style: const TextStyle(color: Brand.deep)),
+            const SizedBox(height: 12),
+          ],
           for (var i = 0; i < widget.features.length; i++) _feature(i),
           const SizedBox(height: 4),
           TextField(
@@ -117,14 +181,16 @@ class _IconsScreenState extends State<IconsScreen> {
           ]),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: _suggest,
+            onPressed: busy ? null : _suggest,
             icon: const Icon(Icons.auto_awesome),
             label: const Text('Ещё варианты'),
           ),
           const SizedBox(height: 16),
           FilledButton(
             onPressed: ready ? _done : null,
-            child: Text(widget.editing ? 'Применить' : 'Далее — превью'),
+            child: Text(_saving
+                ? 'Готовлю превью…'
+                : (widget.editing ? 'Применить' : 'Далее — превью')),
           ),
         ],
       ),
@@ -133,6 +199,7 @@ class _IconsScreenState extends State<IconsScreen> {
 
   Widget _feature(int i) {
     final variants = _variants[i];
+    var n = 0; // номер варианта из библиотеки
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -140,18 +207,19 @@ class _IconsScreenState extends State<IconsScreen> {
             style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         if (variants.isEmpty)
-          const Text('Вариантов пока нет — нажмите «Ещё варианты»',
-              style: TextStyle(color: Brand.deep))
+          Text(
+              _picking ? 'Подбираю…' : 'Вариантов нет — нажмите «Ещё варианты»',
+              style: const TextStyle(color: Brand.deep))
         else
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(children: [
               for (var v = 0; v < variants.length; v++)
                 _tile(
-                    variants[v],
-                    _hasCurrent[i] && v == 0
-                        ? 'Сейчас'
-                        : 'Вариант ${_hasCurrent[i] ? v : v + 1}',
+                    variants[v].paths,
+                    variants[v].name != null
+                        ? 'Вариант ${++n}'
+                        : variants[v].label,
                     _pick[i] == v,
                     () => setState(() => _pick[i] = v)),
             ]),

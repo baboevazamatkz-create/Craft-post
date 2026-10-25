@@ -22,6 +22,7 @@ class AnthropicProvider extends ChatAiProvider {
     required List<Uint8List> images,
     List<String>? labels,
     String effort = 'medium',
+    bool cacheSystem = false,
   }) async {
     if (apiKey.trim().isEmpty) {
       throw Exception(
@@ -42,10 +43,20 @@ class AnthropicProvider extends ChatAiProvider {
       ],
       {'type': 'text', 'text': text},
     ];
-    var body = await _post(system, content, effort);
+    // Длинный постоянный системный текст (список значков) кэшируется.
+    final Object sys = cacheSystem
+        ? [
+            {
+              'type': 'text',
+              'text': system,
+              'cache_control': {'type': 'ephemeral'},
+            }
+          ]
+        : system;
+    var body = await _post(sys, content, effort);
     // Если рассуждения не уместились в лимит — повторяем с меньшим усилием.
     if (body['stop_reason'] == 'max_tokens' && effort != 'low') {
-      body = await _post(system, content, 'low');
+      body = await _post(sys, content, 'low');
     }
     if (body['stop_reason'] == 'refusal') {
       throw Exception('AI отказался обработать это фото. Попробуйте другое.');
@@ -60,7 +71,7 @@ class AnthropicProvider extends ChatAiProvider {
   }
 
   Future<Map<String, dynamic>> _post(
-      String system, List<Map<String, Object>> content, String effort) async {
+      Object system, List<Map<String, Object>> content, String effort) async {
     final resp = await http
         .post(
           Uri.parse('https://api.anthropic.com/v1/messages'),

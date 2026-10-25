@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../../models/post_draft.dart';
+import '../icon_catalog.dart';
 
 /// Общий интерфейс. Чтобы добавить провайдера: реализовать класс
 /// и зарегистрировать его в [createAiProvider].
@@ -23,9 +24,18 @@ abstract class AiProvider {
     required List<String> exclude,
   });
 
-  /// Значки к выбранным преимуществам: для каждого — [kIconVariants]
-  /// разных по идее варианта (наборы SVG-путей). Фото не отправляется.
-  Future<List<List<List<String>>>> suggestIcons({
+  /// Значки из библиотеки [catalog] к выбранным преимуществам: для каждого
+  /// [kLibraryVariants] имён, кроме [exclude]. Фото не отправляется.
+  Future<List<List<String>>> pickIcons({
+    required List<String> features,
+    required IconCatalog catalog,
+    required Set<String> exclude,
+    required String instruction,
+  });
+
+  /// Значки, нарисованные AI: по [kDrawnVariants] на преимущество (наборы
+  /// SVG-путей). Фото не отправляется.
+  Future<List<List<List<String>>>> drawIcons({
     required List<String> features,
     required String instruction,
   });
@@ -43,8 +53,11 @@ abstract class AiProvider {
 /// Сколько вариантов преимуществ предлагать за раз.
 const kFeatureIdeas = 8;
 
-/// Сколько вариантов значка просить для каждого преимущества.
-const kIconVariants = 3;
+/// Сколько значков на преимущество подбирать из библиотеки за раз.
+const kLibraryVariants = 2;
+
+/// Сколько значков на преимущество рисует AI за раз.
+const kDrawnVariants = 1;
 
 const _featureRules =
     'Преимущество — 1–3 слова для нижней строки инфографики под значком: '
@@ -65,8 +78,7 @@ const kIconSystemPrompt =
     'Ты дизайнер тонких линейных пиктограмм для премиальной инфографики '
     'компании-электромонтажника. Внизу инфографики три преимущества, у '
     'каждого значок над подписью. Нарисуй для каждого преимущества '
-    '$kIconVariants РАЗНЫХ по идее значка (разные метафоры, а не одна и та же '
-    'картинка с мелкими отличиями). '
+    '$kDrawnVariants значок — с интересной, точной метафорой. '
     'Стиль: как в архитектурных и инженерных презентациях — тонкая линия '
     'одной толщины, без заливки, скруглённые концы, достаточно деталей, '
     'чтобы рисунок был интересным и узнаваемым (например: солнце с лучами и '
@@ -79,8 +91,40 @@ const kIconSystemPrompt =
     'мелкие детали не меньше 1 единицы, линии не сливаются. '
     'Учти пожелание пользователя. '
     'Ответ строго JSON без пояснений: {"features": [{"text": "...", '
-    '"variants": [["d", "d"], ["d"], ["d"]]}]} — в том же порядке, что '
+    '"variants": [["d", "d", "d"]]}]} — в том же порядке, что '
     'преимущества в запросе.';
+
+/// Подбор из библиотеки: правила + полный список имён. Текст постоянный
+/// для одного каталога, поэтому запрос кэшируется и стоит копейки.
+String iconPickSystemPrompt(IconCatalog catalog) =>
+    'Ты подбираешь значки для инфографики компании-электромонтажника из '
+    'библиотеки тонких линейных иконок Tabler. Внизу инфографики три '
+    'преимущества, у каждого значок над подписью. Для каждого преимущества '
+    'выбери $kLibraryVariants значка, которые точнее и интереснее всего '
+    'передают смысл, разные по идее (например, «Автоматика день-ночь» — '
+    'sun-moon, clock-bolt; «Работа на высоте» — ladder, crane). Бери только '
+    'имена из списка ниже, точно как написаны. Не предлагай имена из строки '
+    '«Уже показаны». Учти пожелание пользователя. '
+    'Ответ строго JSON без пояснений: {"features": [{"text": "...", '
+    '"icons": ["name", "name"]}]} — в том же порядке, что преимущества в '
+    'запросе.\n\nСписок значков:\n${catalog.namesText}';
+
+/// Имена значков по порядку преимуществ: только из каталога, без повторов
+/// и без [exclude].
+List<List<String>> parsePickJson(
+    String raw, int count, IconCatalog catalog, Set<String> exclude) {
+  final list = (_jsonObject(raw)['features'] as List?) ?? [];
+  final used = {...exclude};
+  return [
+    for (var i = 0; i < count; i++)
+      [
+        if (i < list.length && list[i] is Map)
+          for (final n in ((list[i] as Map)['icons'] as List? ?? []))
+            if (catalog.icons.containsKey('$n'.trim()) && used.add('$n'.trim()))
+              '$n'.trim(),
+      ],
+  ];
+}
 
 String iconRequestText(List<String> features, String instruction) => [
       for (var i = 0; i < features.length; i++)
@@ -132,8 +176,10 @@ abstract class ChatAiProvider implements AiProvider {
     required List<Uint8List> images,
     List<String>? labels,
     String effort = 'medium',
+    bool cacheSystem = false,
   });
 
+  // Тексты — с низким усилием рассуждений: так заметно быстрее.
   @override
   Future<AiResult> generate({
     required Uint8List mainPhotoJpeg,
@@ -142,7 +188,8 @@ abstract class ChatAiProvider implements AiProvider {
       parseAiJson(await ask(
           system: kSystemPrompt,
           text: fieldsToText(fields),
-          images: [mainPhotoJpeg]));
+          images: [mainPhotoJpeg],
+          effort: 'low'));
 
   @override
   Future<List<String>> suggestFeatures({
@@ -154,10 +201,31 @@ abstract class ChatAiProvider implements AiProvider {
           system: kFeatureSystemPrompt,
           text: '${fieldsToText(fields)}\n\nУже предложены: '
               '${exclude.join('; ')}\n\nПредложи ещё $kFeatureIdeas.',
-          images: [mainPhotoJpeg]));
+          images: [mainPhotoJpeg],
+          effort: 'low'));
 
   @override
-  Future<List<List<List<String>>>> suggestIcons({
+  Future<List<List<String>>> pickIcons({
+    required List<String> features,
+    required IconCatalog catalog,
+    required Set<String> exclude,
+    required String instruction,
+  }) async =>
+      parsePickJson(
+          await ask(
+              system: iconPickSystemPrompt(catalog),
+              text: '${iconRequestText(features, instruction)}\n'
+                  'Уже показаны: ${exclude.isEmpty ? '—' : exclude.join(', ')}',
+              images: const [],
+              effort: 'low',
+              cacheSystem: true),
+          features.length,
+          catalog,
+          exclude);
+
+  // Рисование — с высоким усилием: идёт фоном, качество важнее скорости.
+  @override
+  Future<List<List<List<String>>>> drawIcons({
     required List<String> features,
     required String instruction,
   }) async =>
@@ -185,7 +253,7 @@ abstract class ChatAiProvider implements AiProvider {
               'Главное фото — только для понимания объекта, его не размечай',
               for (var i = 0; i < otherJpegs.length; i++) 'Фото ${i + 1}',
             ],
-            effort: 'high',
+            effort: 'medium',
           ),
           otherJpegs.length);
 }

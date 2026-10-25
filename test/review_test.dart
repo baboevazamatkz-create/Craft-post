@@ -7,6 +7,7 @@ import 'package:craft_post/screens/preview_screen.dart';
 import 'package:craft_post/services/ai/ai_provider.dart';
 import 'package:craft_post/services/ai/ai_factory.dart';
 import 'package:craft_post/services/ai/stub_provider.dart';
+import 'package:craft_post/services/icon_catalog.dart';
 import 'package:craft_post/services/image/badges.dart';
 import 'package:craft_post/services/image/fit_text.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -128,6 +129,26 @@ void main() {
     expect(r[2], isEmpty);
   });
 
+  test('parsePickJson: только имена из каталога, без повторов и показанных',
+      () {
+    final cat = IconCatalog({
+      'ladder': ['M1 1'],
+      'crane': ['M2 2'],
+      'sun-moon': ['M3 3'],
+    });
+    final r = parsePickJson(
+        '{"features":[{"icons":["ladder","nope","crane"]},'
+        '{"icons":["crane","sun-moon"]}]}',
+        3,
+        cat,
+        {'ladder'});
+    expect(r, [
+      ['crane'],
+      ['sun-moon'],
+      <String>[],
+    ]);
+  });
+
   test('parseFeatureJson: строки и объекты, без повторов и пустых', () {
     expect(
         parseFeatureJson('{"features":["Скрытая проводка",{"text":"Работа '
@@ -135,7 +156,7 @@ void main() {
         ['Скрытая проводка', 'Работа на высоте']);
   });
 
-  testWidgets('Преимущества: выбор трёх, затем AI сразу рисует значки',
+  testWidgets('Преимущества: выбор трёх, затем сразу значки (библиотека + AI)',
       (t) async {
     FlutterSecureStorage.setMockInitialValues({});
     t.view.physicalSize = const Size(1080, 2340);
@@ -143,6 +164,7 @@ void main() {
     addTearDown(t.view.reset);
     final s = stateWith3Photos()..aiOverride = StubAiProvider();
     s.draft.infographic = InfographicText(); // новый пост: ничего не выбрано
+    await t.runAsync(s.catalog); // библиотека значков из assets
     s.draft.featureIdeas = [
       'Автоматика день-ночь',
       'Дистанционная настройка',
@@ -162,7 +184,8 @@ void main() {
     await t.runAsync(() => Future<void>.delayed(const Duration(seconds: 1)));
     await settle(t);
     expect(find.text('1. Скрытая проводка'), findsOneWidget);
-    expect(find.text('Вариант 3'), findsNWidgets(3));
+    expect(find.text('Вариант 2'), findsNWidgets(3)); // из библиотеки
+    expect(find.text('Рисунок AI'), findsNWidgets(3));
     final next = find.widgetWithText(FilledButton, 'Далее — превью');
     await t.scrollUntilVisible(next, 300,
         scrollable: find.byType(Scrollable).first);
@@ -313,7 +336,7 @@ void main() {
 
   test('Без ключа — понятная ошибка, а не случайные значки', () async {
     final ai = createAiProvider('anthropic', '');
-    expect(() => ai.suggestIcons(features: ['Свет'], instruction: ''),
+    expect(() => ai.drawIcons(features: ['Свет'], instruction: ''),
         throwsA(predicate((e) => '$e'.contains('Не введён API-ключ'))));
     expect(createAiProvider('stub', 'k'), isNot(isA<StubAiProvider>()));
   });

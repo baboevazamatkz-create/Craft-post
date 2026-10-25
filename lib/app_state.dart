@@ -5,6 +5,7 @@ import 'models/post_draft.dart';
 import 'services/ai/ai_factory.dart';
 import 'services/ai/ai_provider.dart';
 import 'platform/platform.dart';
+import 'services/icon_catalog.dart';
 import 'services/image/image_processor.dart';
 import 'services/image_saver.dart';
 import 'services/post_store.dart';
@@ -118,10 +119,30 @@ class AppState extends ChangeNotifier {
     return added.length;
   }
 
-  /// Значки к выбранным преимуществам (в AI уходят только их подписи).
-  Future<List<List<List<String>>>> suggestIcons(
+  IconCatalog? _catalog;
+
+  /// Библиотека значков (загружается один раз).
+  Future<IconCatalog> catalog() async => _catalog ??= await IconCatalog.load();
+
+  /// Значки из библиотеки к преимуществам: имена → пути (в AI уходят только
+  /// подписи преимуществ и список имён).
+  Future<List<List<(String, List<String>)>>> pickIcons(
+      List<String> features, String instruction, Set<String> exclude) async {
+    final cat = await catalog();
+    final names = await (await _ai()).pickIcons(
+        features: features,
+        catalog: cat,
+        exclude: exclude,
+        instruction: instruction);
+    return [
+      for (final list in names) [for (final n in list) (n, cat.icons[n]!)]
+    ];
+  }
+
+  /// Значки, нарисованные AI (дольше; идут фоном).
+  Future<List<List<List<String>>>> drawIcons(
           List<String> features, String instruction) async =>
-      (await _ai()).suggestIcons(features: features, instruction: instruction);
+      (await _ai()).drawIcons(features: features, instruction: instruction);
 
   /// Выбранные преимущества со значками — на главное фото, затем превью.
   Future<void> setFeatures(List<Feature> features) async {

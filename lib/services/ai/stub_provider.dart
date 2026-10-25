@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import '../../models/post_draft.dart';
 import '../../models/icon_library.dart';
+import '../icon_catalog.dart';
 import 'ai_provider.dart';
 
 /// Работает без сети и ключа: собирает текст из полей формы. Нужна только
@@ -69,9 +70,28 @@ class StubAiProvider implements AiProvider {
     ];
   }
 
-  /// Без AI: случайные встроенные значки, только чтобы пройти шаг.
+  /// Без AI: случайные значки из библиотеки, только чтобы пройти шаг.
   @override
-  Future<List<List<List<String>>>> suggestIcons({
+  Future<List<List<String>>> pickIcons({
+    required List<String> features,
+    required IconCatalog catalog,
+    required Set<String> exclude,
+    required String instruction,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    final names = [
+      for (final n in catalog.icons.keys)
+        if (!exclude.contains(n)) n
+    ]..shuffle(Random());
+    return [
+      for (var i = 0; i < features.length; i++)
+        names.skip(i * kLibraryVariants).take(kLibraryVariants).toList(),
+    ];
+  }
+
+  /// Без AI: случайные встроенные значки вместо рисунка.
+  @override
+  Future<List<List<List<String>>>> drawIcons({
     required List<String> features,
     required String instruction,
   }) async {
@@ -80,7 +100,7 @@ class StubAiProvider implements AiProvider {
     return [
       for (final _ in features)
         [
-          for (final i in ([...kIcons]..shuffle(rnd)).take(kIconVariants))
+          for (final i in ([...kIcons]..shuffle(rnd)).take(kDrawnVariants))
             i.paths
         ],
     ];

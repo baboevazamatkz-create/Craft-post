@@ -25,6 +25,7 @@ class OpenAiProvider extends ChatAiProvider {
     required List<Uint8List> images,
     List<String>? labels,
     String effort = 'medium',
+    bool cacheSystem = false,
   }) async {
     if (apiKey.trim().isEmpty) {
       throw Exception(
